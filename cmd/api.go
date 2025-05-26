@@ -21,19 +21,15 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	if err != nil {
 		return err
 	}
-	graphDb, err := graphDatabase.InitDriver(&devConf.GraphDatabaseConfig)
-	if err != nil {
-		return err
-	}
 
-	psqlDb, err := postgresDB.NewDatabase(devConf)
-	if err != nil {
-		return err
-	}
-	err = psqlDb.Migrate()
-	if err != nil {
-		return err
-	}
+	//psqlDb, err := postgresDB.NewDatabase(devConf)
+	//if err != nil {
+	//	return err
+	//}
+	//err = psqlDb.Migrate()
+	//if err != nil {
+	//	return err
+	//}
 
 	ctx, stp := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	app := fiber.New()
@@ -51,14 +47,10 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	// Shutdown with timeout
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
-	err = psqlDb.Close()
-	if err != nil {
-		return err
-	}
-	err = graphDb.Close(shutdownCtx)
-	if err != nil {
-		return err
-	}
+	//err = psqlDb.Close()
+	//if err != nil {
+	//	return err
+	//}
 	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
 		logger.Fatal("Server shutdown error: %v", zap.String("error", err.Error()))
 		return err
