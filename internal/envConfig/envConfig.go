@@ -16,10 +16,12 @@ func CheckFileExists(filePath string) bool {
 
 type AppConfig struct {
 	DatabaseConfig
-	AppName    string `env:"APP_NAME" envDefault:"eye on"`
-	AppVersion string `env:"APP_VERSION" envDefault:"0.0.1"`
-	HOST       string `env:"HOST" envDefault:"0.0.0.0"`
-	PORT       string `env:"PORT" envDefault:"8080"`
+	AppName       string `env:"APP_NAME" envDefault:"eye on"`
+	AppVersion    string `env:"APP_VERSION" envDefault:"0.0.1"`
+	HOST          string `env:"HOST" envDefault:"0.0.0.0"`
+	PORT          string `env:"PORT" envDefault:"8080"`
+	EncryptionKey string `env:"ENCRYPTION_KEY"`
+	JWTKey        string `env:"JWT_KEY"`
 }
 
 type DatabaseConfig struct {

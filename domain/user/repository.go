@@ -3,13 +3,14 @@ package user
 import (
 	"context"
 	"github.com/google/uuid"
+	"github.com/rzabhd80/eye-on/internal/database/models"
 	"gorm.io/gorm"
 )
 
 type IUserRepository interface {
-	Create(ctx context.Context, user *User) error
+	Create(ctx context.Context, user *models.User) error
 	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
-	GetByUsername(ctx context.Context, username string) (*User, error)
+	GetByUsername(ctx context.Context, username string) (*models.User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	Update(ctx context.Context, user *User) error
 	Delete(ctx context.Context, id uuid.UUID) error
@@ -24,7 +25,7 @@ func NewGormUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) Create(ctx context.Context, user *User) error {
+func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	return r.db.WithContext(ctx).Create(user).Error
 }
 
@@ -37,8 +38,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*User, erro
 	return &user, nil
 }
 
-func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
-	var user User
+func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
+	var user models.User
 	err := r.db.WithContext(ctx).First(&user, "username = ?", username).Error
 	if err != nil {
 		return nil, err

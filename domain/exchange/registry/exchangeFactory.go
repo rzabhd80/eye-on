@@ -9,6 +9,8 @@ import (
 	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
 	"github.com/rzabhd80/eye-on/domain/traidingPair"
 	"github.com/rzabhd80/eye-on/internal/database/models"
+	envCofig "github.com/rzabhd80/eye-on/internal/envConfig"
+	"github.com/rzabhd80/eye-on/internal/helpers"
 	"gorm.io/gorm"
 	"time"
 )
@@ -38,7 +40,7 @@ func NewRegistry(repo *exchange.ExchangeRepository, tradingRepo *traidingPair.Tr
 }
 
 // Register is called by each adapter in its init()
-func (r *Registry) Register(name string, constructor Constructor) {
+func (r *Registry) Register(name string, constructor Constructor, envConfig envCofig.AppConfig) {
 	if _, dup := r.constructors[name]; dup {
 		panic("exchange " + name + " already registered")
 	}
@@ -56,7 +58,8 @@ type ExchangeResult struct {
 }
 
 // GetOrCreateExchangeConfig creates or retrieves an exchange and its credentials from the database
-func (r *Registry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeConfig) (*ExchangeResult, error) {
+func (r *Registry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeConfig, envConf envCofig.AppConfig) (
+	*ExchangeResult, error) {
 
 	constructor, ok := r.constructors[cfg.Name]
 	if !ok {
@@ -116,9 +119,12 @@ func (r *Registry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeCo
 	).First(&credential).Error
 
 	isNewCredential := false
-
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			secretKey, err := helpers.Encrypt(cfg.SecretKey, []byte(envConf.EncryptionKey))
+			if err != nil {
+				return nil, err
+			}
 			// Create new credential
 			credential = models.ExchangeCredential{
 				BaseModel: models.BaseModel{
@@ -128,7 +134,7 @@ func (r *Registry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeCo
 				ExchangeID:  exchangeInstance.ID,
 				Label:       label,
 				APIKey:      cfg.APIKey,
-				SecretKey:   cfg.SecretKey,
+				SecretKey:   secretKey,
 				Passphrase:  cfg.Passphrase,
 				IsActive:    true,
 				IsTestnet:   cfg.IsTestnet,
@@ -332,17 +338,17 @@ func SetDefaultRegistry(registry *Registry) {
 }
 
 // Register registers an exchange constructor in the default registry
-func Register(name string, constructor Constructor) {
+func Register(name string, constructor Constructor, envConf envCofig.AppConfig) {
 	if defaultRegistry == nil {
 		panic("default registry not initialized. Call SetDefaultRegistry first")
 	}
-	defaultRegistry.Register(name, constructor)
+	defaultRegistry.Register(name, constructor, envConf)
 }
 
 // GetOrCreateExchange uses the default registry
-func GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig) (*ExchangeResult, error) {
+func GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig, envConf envCofig.AppConfig) (*ExchangeResult, error) {
 	if defaultRegistry == nil {
 		return nil, fmt.Errorf("default registry not initialized")
 	}
-	return defaultRegistry.GetOrCreateExchangeConfig(ctx, cfg)
+	return defaultRegistry.GetOrCreateExchangeConfig(ctx, cfg, envConf)
 }

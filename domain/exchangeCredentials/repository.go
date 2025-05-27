@@ -9,7 +9,7 @@ import (
 )
 
 type IExchangeCredentialRepository interface {
-	Create(ctx context.Context, cred *ExchangeCredential) error
+	Create(ctx context.Context, cred *models.ExchangeCredential) error
 	GetByID(ctx context.Context, id uuid.UUID) (*ExchangeCredential, error)
 	GetByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) ([]models.ExchangeCredential, error)
 	Update(ctx context.Context, cred *ExchangeCredential) error
@@ -25,7 +25,7 @@ func NewGormExchangeCredentialRepository(db *gorm.DB) IExchangeCredentialReposit
 	return &ExchangeCredentialRepository{db: db}
 }
 
-func (r *ExchangeCredentialRepository) Create(ctx context.Context, cred *ExchangeCredential) error {
+func (r *ExchangeCredentialRepository) Create(ctx context.Context, cred *models.ExchangeCredential) error {
 	return r.db.WithContext(ctx).Create(cred.exchangeCredentials).Error
 }
 
@@ -44,7 +44,7 @@ func (r *ExchangeCredentialRepository) GetByUserAndExchange(ctx context.Context,
 	var creds []models.ExchangeCredential
 	err := r.db.WithContext(ctx).
 		Preload("Exchange").
-		Where("user_id = ? AND exchange_id = ?", userID, exchangeID).
+		Where("user_id = ? AND exchange_id = ? AND is_active = ?", userID, exchangeID, true).
 		Find(&creds).Error
 	return creds, err
 }

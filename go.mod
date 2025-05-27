@@ -7,11 +7,13 @@ toolchain go1.23.9
 require (
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/gofiber/fiber/v2 v2.52.8
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/urfave/cli/v2 v2.27.6
 	go.uber.org/zap v1.27.0
+	golang.org/x/crypto v0.36.0
 	gorm.io/gorm v1.30.0
 )
 

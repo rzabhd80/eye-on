@@ -3,13 +3,14 @@ package exchange
 import (
 	"context"
 	"github.com/google/uuid"
+	"github.com/rzabhd80/eye-on/internal/database/models"
 	"gorm.io/gorm"
 )
 
 type IExchangeRepository interface {
 	Create(ctx context.Context, exchange *Exchange) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Exchange, error)
-	GetByName(ctx context.Context, name string) (*Exchange, error)
+	GetByName(ctx context.Context, name string) (*models.Exchange, error)
 	Update(ctx context.Context, exchange *Exchange) error
 	Delete(ctx context.Context, exchange Exchange) error
 	List(ctx context.Context, activeOnly bool) ([]Exchange, error)
@@ -32,7 +33,7 @@ func NewExchangeRepository(db *gorm.DB) IExchangeRepository {
 	return &ExchangeRepository{Db: db}
 }
 
-func (r *ExchangeRepository) GetByName(ctx context.Context, name string) (*Exchange, error) {
+func (r *ExchangeRepository) GetByName(ctx context.Context, name string) (*models.Exchange, error) {
 	var config Exchange
 	err := r.Db.WithContext(ctx).Where("name = ? AND is_active = ?", name, true).First(&config.exchange).Error
 	if err != nil {
