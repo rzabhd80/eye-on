@@ -3,57 +3,65 @@ package exchange
 import (
 	"context"
 	"github.com/google/uuid"
-	"github.com/rzabhd80/eye-on/domain/exchange/registry"
 	"gorm.io/gorm"
 )
 
-type ExchangeRepository interface {
+type IExchangeRepository interface {
 	Create(ctx context.Context, exchange *Exchange) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Exchange, error)
 	GetByName(ctx context.Context, name string) (*Exchange, error)
 	Update(ctx context.Context, exchange *Exchange) error
-	Delete(ctx context.Context, id uuid.UUID) error
+	Delete(ctx context.Context, exchange Exchange) error
 	List(ctx context.Context, activeOnly bool) ([]Exchange, error)
 }
 
-type exchangeRepository struct {
-	db *gorm.DB
+type ExchangeRepository struct {
+	Db *gorm.DB
 }
 
-func NewExchangeRepository(db *gorm.DB) ExchangeRepository {
-	return &exchangeRepository{db: db}
-}
-
-func (r *exchangeRepository) GetByName(ctx context.Context, name string) (*registry.ExchangeConfig, error) {
-	var config domain.ExchangeConfig
-	err := r.db.WithContext(ctx).Where("name = ? AND is_active = ?", name, true).First(&config).Error
+func (r *ExchangeRepository) GetByID(ctx context.Context, id uuid.UUID) (*Exchange, error) {
+	var config Exchange
+	err := r.Db.WithContext(ctx).Where("id = ? AND is_active = ?", id, true).Find(&config.exchange).Error
 	if err != nil {
 		return nil, err
 	}
 	return &config, nil
 }
 
-func (r *exchangeRepository) GetAll(ctx context.Context) ([]domain.ExchangeConfig, error) {
-	var configs []domain.ExchangeConfig
-	err := r.db.WithContext(ctx).Where("is_active = ?", true).Find(&configs).Error
+func NewExchangeRepository(db *gorm.DB) IExchangeRepository {
+	return &ExchangeRepository{Db: db}
+}
+
+func (r *ExchangeRepository) GetByName(ctx context.Context, name string) (*Exchange, error) {
+	var config Exchange
+	err := r.Db.WithContext(ctx).Where("name = ? AND is_active = ?", name, true).First(&config.exchange).Error
+	if err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+func (r *ExchangeRepository) GetAll(ctx context.Context) (Exchange, error) {
+	var configs Exchange
+	err := r.Db.WithContext(ctx).Where("is_active = ?", true).Find(&configs.exchange).Error
 	return configs, err
 }
 
-func (r *exchangeRepository) Create(ctx context.Context, config *domain.ExchangeConfig) error {
-	return r.db.WithContext(ctx).Create(config).Error
+func (r *ExchangeRepository) Create(ctx context.Context, config *Exchange) error {
+	return r.Db.WithContext(ctx).Create(config.exchange).Error
 }
 
-func (r *exchangeRepository) Update(ctx context.Context, config *domain.ExchangeConfig) error {
-	return r.db.WithContext(ctx).Save(config).Error
+func (r *ExchangeRepository) Update(ctx context.Context, config *Exchange) error {
+	return r.Db.WithContext(ctx).Save(config.exchange).Error
 }
 
-func (r *exchangeRepository) Delete(ctx context.Context, id string) error {
-	return r.db.WithContext(ctx).Delete(&domain.ExchangeConfig{}, "id = ?", id).Error
+func (r *ExchangeRepository) Delete(ctx context.Context, exchange Exchange) error {
+	return r.Db.WithContext(ctx).Delete(&Exchange{}, "id = ?", exchange.exchange.ID).Error
 }
 
-func (r *exchangeRepository) List(ctx context.Context, activeOnly bool) ([]Exchange, error) {
+func (r *ExchangeRepository) List(ctx context.Context, activeOnly bool) ([]Exchange, error) {
 	var exchanges []Exchange
-	query := r.db.WithContext(ctx)
+	query := r.Db.WithContext(ctx)
 	if activeOnly {
 		query = query.Where("is_active = ?", true)
 	}

@@ -15,7 +15,11 @@ type RetryConfig struct {
 	MaxDelay    time.Duration
 	Multiplier  float64
 }
-
+type Symbol struct {
+	Symbol     string
+	BaseAsset  string
+	QuoteAsset string
+}
 type ExchangeConfig struct {
 	Name        string
 	DisplayName string
@@ -30,6 +34,7 @@ type ExchangeConfig struct {
 	Features    map[string]interface{} // Will be stored as JSONB
 	UserID      uuid.UUID              // Required for ExchangeCredential
 	Label       string                 // defaults to "Default"
+	symbols     []Symbol
 }
 
 type IExchange interface {

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type ExchangeCredentialRepository interface {
+type IExchangeCredentialRepository interface {
 	Create(ctx context.Context, cred *ExchangeCredential) error
 	GetByID(ctx context.Context, id uuid.UUID) (*ExchangeCredential, error)
 	GetByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) ([]ExchangeCredential, error)
@@ -16,19 +16,19 @@ type ExchangeCredentialRepository interface {
 	UpdateLastUsed(ctx context.Context, id uuid.UUID) error
 }
 
-type GormExchangeCredentialRepository struct {
+type ExchangeCredentialRepository struct {
 	db *gorm.DB
 }
 
-func NewGormExchangeCredentialRepository(db *gorm.DB) *GormExchangeCredentialRepository {
-	return &GormExchangeCredentialRepository{db: db}
+func NewGormExchangeCredentialRepository(db *gorm.DB) IExchangeCredentialRepository {
+	return &ExchangeCredentialRepository{db: db}
 }
 
-func (r *GormExchangeCredentialRepository) Create(ctx context.Context, cred *ExchangeCredential) error {
+func (r *ExchangeCredentialRepository) Create(ctx context.Context, cred *ExchangeCredential) error {
 	return r.db.WithContext(ctx).Create(cred).Error
 }
 
-func (r *GormExchangeCredentialRepository) GetByID(ctx context.Context, id uuid.UUID) (*ExchangeCredential, error) {
+func (r *ExchangeCredentialRepository) GetByID(ctx context.Context, id uuid.UUID) (*ExchangeCredential, error) {
 	var cred ExchangeCredential
 	err := r.db.WithContext(ctx).Preload("User").Preload("Exchange").First(&cred, "id = ?", id).Error
 	if err != nil {
@@ -37,7 +37,7 @@ func (r *GormExchangeCredentialRepository) GetByID(ctx context.Context, id uuid.
 	return &cred, nil
 }
 
-func (r *GormExchangeCredentialRepository) GetByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) ([]ExchangeCredential, error) {
+func (r *ExchangeCredentialRepository) GetByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) ([]ExchangeCredential, error) {
 	var creds []ExchangeCredential
 	err := r.db.WithContext(ctx).
 		Preload("Exchange").
@@ -46,15 +46,15 @@ func (r *GormExchangeCredentialRepository) GetByUserAndExchange(ctx context.Cont
 	return creds, err
 }
 
-func (r *GormExchangeCredentialRepository) Update(ctx context.Context, cred *ExchangeCredential) error {
+func (r *ExchangeCredentialRepository) Update(ctx context.Context, cred *ExchangeCredential) error {
 	return r.db.WithContext(ctx).Save(cred).Error
 }
 
-func (r *GormExchangeCredentialRepository) Delete(ctx context.Context, id uuid.UUID) error {
+func (r *ExchangeCredentialRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Delete(&ExchangeCredential{}, id).Error
 }
 
-func (r *GormExchangeCredentialRepository) UpdateLastUsed(ctx context.Context, id uuid.UUID) error {
+func (r *ExchangeCredentialRepository) UpdateLastUsed(ctx context.Context, id uuid.UUID) error {
 	now := time.Now()
 	return r.db.WithContext(ctx).Model(&ExchangeCredential{}).
 		Where("id = ?", id).

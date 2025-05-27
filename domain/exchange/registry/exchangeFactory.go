@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/rzabhd80/eye-on/domain/exchange"
+	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
+	"github.com/rzabhd80/eye-on/domain/traidingPair"
 	"github.com/rzabhd80/eye-on/internal/database/models"
 	"gorm.io/gorm"
 	"time"
@@ -18,14 +21,19 @@ var (
 
 // Registry manages exchange registration and creation
 type Registry struct {
-	db           *gorm.DB
-	constructors map[string]Constructor
+	exchangeRepo            *exchange.ExchangeRepository
+	tradingPairRepo         *traidingPair.TradingPairRepository
+	exchangeCredentialsRepo *exchangeCredentials.ExchangeCredentialRepository
+	constructors            map[string]Constructor
 }
 
-func NewRegistry(db *gorm.DB) *Registry {
+func NewRegistry(repo *exchange.ExchangeRepository, tradingRepo *traidingPair.TradingPairRepository,
+	exchangeCredentialsRepo *exchangeCredentials.ExchangeCredentialRepository) *Registry {
 	return &Registry{
-		db:           db,
-		constructors: make(map[string]Constructor),
+		exchangeRepo:            repo,
+		tradingPairRepo:         tradingRepo,
+		exchangeCredentialsRepo: exchangeCredentialsRepo,
+		constructors:            make(map[string]Constructor),
 	}
 }
 
@@ -41,35 +49,38 @@ func (r *Registry) Register(name string, constructor Constructor) {
 type ExchangeResult struct {
 	Exchange        *models.Exchange
 	Credential      *models.ExchangeCredential
+	symbols         []traidingPair.TradingPair
 	Instance        IExchange
 	IsNewExchange   bool
 	IsNewCredential bool
 }
 
-// GetOrCreateExchange creates or retrieves an exchange and its credentials from the database
-func (r *Registry) GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig) (*ExchangeResult, error) {
+// GetOrCreateExchangeConfig creates or retrieves an exchange and its credentials from the database
+func (r *Registry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeConfig) (*ExchangeResult, error) {
+
 	constructor, ok := r.constructors[cfg.Name]
 	if !ok {
-		return nil, fmt.Errorf("exchange %s not supported", cfg.Name)
+		return nil, fmt.Errorf("exchangeInstance %s not supported", cfg.Name)
 	}
 
 	// Start a transaction
-	tx := r.db.WithContext(ctx).Begin()
+	tx := r.exchangeRepo.Db.WithContext(ctx).Begin()
 	defer func() {
+
 		if r := recover(); r != nil {
 			tx.Rollback()
 		}
 	}()
 
-	// Check if exchange exists
-	var exchange models.Exchange
-	err := tx.Where("name = ? AND is_active = ?", cfg.Name, true).First(&exchange).Error
+	// Check if exchangeInstance exists
+	var exchangeInstance models.Exchange
+	err := tx.Where("name = ? AND is_active = ?", cfg.Name, true).First(&exchangeInstance).Error
 	isNewExchange := false
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Create new exchange
-			exchange = models.Exchange{
+			// Create new exchangeInstance
+			exchangeInstance = models.Exchange{
 				BaseModel: models.BaseModel{
 					ID: uuid.New(),
 				},
@@ -81,18 +92,18 @@ func (r *Registry) GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig) 
 				Features:    models.JSONB(cfg.Features),
 			}
 
-			if err := tx.Create(&exchange).Error; err != nil {
+			if err := tx.Create(&exchangeInstance).Error; err != nil {
 				tx.Rollback()
-				return nil, fmt.Errorf("failed to create exchange: %w", err)
+				return nil, fmt.Errorf("failed to create exchangeInstance: %w", err)
 			}
 			isNewExchange = true
 		} else {
 			tx.Rollback()
-			return nil, fmt.Errorf("failed to query exchange: %w", err)
+			return nil, fmt.Errorf("failed to query exchangeInstance: %w", err)
 		}
 	}
 
-	// Check if credential exists for this user and exchange
+	// Check if credential exists for this user and exchangeInstance
 	var credential models.ExchangeCredential
 	label := cfg.Label
 	if label == "" {
@@ -101,20 +112,20 @@ func (r *Registry) GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig) 
 
 	err = tx.Where(
 		"user_id = ? AND exchange_id = ? AND label = ? AND is_active = ?",
-		cfg.UserID, exchange.ID, label, true,
+		cfg.UserID, exchangeInstance.ID, label, true,
 	).First(&credential).Error
 
 	isNewCredential := false
 
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Create new credential
 			credential = models.ExchangeCredential{
 				BaseModel: models.BaseModel{
 					ID: uuid.New(),
 				},
 				UserID:      cfg.UserID,
-				ExchangeID:  exchange.ID,
+				ExchangeID:  exchangeInstance.ID,
 				Label:       label,
 				APIKey:      cfg.APIKey,
 				SecretKey:   cfg.SecretKey,
@@ -126,12 +137,12 @@ func (r *Registry) GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig) 
 
 			if err := tx.Create(&credential).Error; err != nil {
 				tx.Rollback()
-				return nil, fmt.Errorf("failed to create exchange credential: %w", err)
+				return nil, fmt.Errorf("failed to create exchangeInstance credential: %w", err)
 			}
 			isNewCredential = true
 		} else {
 			tx.Rollback()
-			return nil, fmt.Errorf("failed to query exchange credential: %w", err)
+			return nil, fmt.Errorf("failed to query exchangeInstance credential: %w", err)
 		}
 	} else {
 		// Update existing credential if API keys have changed
@@ -156,33 +167,66 @@ func (r *Registry) GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig) 
 		if updated {
 			if err := tx.Save(&credential).Error; err != nil {
 				tx.Rollback()
-				return nil, fmt.Errorf("failed to update exchange credential: %w", err)
+				return nil, fmt.Errorf("failed to update exchangeInstance credential: %w", err)
 			}
 		}
 	}
+	//TODO!!! it should be edited to check each and every on of them
+	//setting up the symbols
+	var exchangeSymbols []string
+	for _, symbol := range cfg.symbols {
+		exchangeSymbols = append(exchangeSymbols, symbol.Symbol)
+	}
+	tradingPairs, err := r.tradingPairRepo.GetSymbolsList(ctx, exchangeInstance.ID, true, exchangeSymbols)
+	if err != nil {
+		return nil, err
+	}
+	if len(tradingPairs) != len(cfg.symbols) {
+		var newPairs []traidingPair.TradingPair
 
+		for _, symbolPair := range cfg.symbols {
+			tradingPair := traidingPair.TradingPair{
+				TradingPair: models.TradingPair{
+					BaseModel: models.BaseModel{
+						ID: uuid.New(),
+					},
+					ExchangeID: exchangeInstance.ID,
+					Symbol:     symbolPair.Symbol,
+					BaseAsset:  symbolPair.BaseAsset,
+					QuoteAsset: symbolPair.QuoteAsset,
+				},
+			}
+			errPair := r.tradingPairRepo.Create(ctx, &tradingPair)
+			if errPair != nil {
+				return nil, errPair
+			}
+			newPairs = append(newPairs, tradingPair)
+		}
+
+	}
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Create the exchange instance
+	// Create the exchangeInstance instance
 	instance, err := constructor(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create exchange instance: %w", err)
+		return nil, fmt.Errorf("failed to create exchangeInstance instance: %w", err)
 	}
 
 	// Update last used timestamp
 	now := time.Now()
 	credential.LastUsed = &now
-	r.db.WithContext(ctx).Save(&credential)
+	r.exchangeRepo.Db.WithContext(ctx).Save(&credential)
 
 	return &ExchangeResult{
-		Exchange:        &exchange,
+		Exchange:        &exchangeInstance,
 		Credential:      &credential,
 		Instance:        instance,
 		IsNewExchange:   isNewExchange,
 		IsNewCredential: isNewCredential,
+		symbols:         tradingPairs,
 	}, nil
 }
 
@@ -199,7 +243,7 @@ func (r *Registry) GetExchange(ctx context.Context, userID uuid.UUID, exchangeNa
 
 	// Query with joins to get both exchange and credential info
 	var credential models.ExchangeCredential
-	err := r.db.WithContext(ctx).
+	err := r.exchangeRepo.Db.WithContext(ctx).
 		Preload("Exchange").
 		Where("user_id = ? AND label = ? AND is_active = ?", userID, label, true).
 		Joins("JOIN exchanges ON exchanges.id = exchange_credentials.exchange_id").
@@ -236,7 +280,7 @@ func (r *Registry) GetExchange(ctx context.Context, userID uuid.UUID, exchangeNa
 	// Update last used timestamp
 	now := time.Now()
 	credential.LastUsed = &now
-	r.db.WithContext(ctx).Save(&credential)
+	r.exchangeRepo.Db.WithContext(ctx).Save(&credential)
 
 	return &ExchangeResult{
 		Exchange:        &credential.Exchange,
@@ -262,7 +306,7 @@ func (r *Registry) DeactivateCredential(ctx context.Context, userID uuid.UUID, e
 		label = "Default"
 	}
 
-	result := r.db.WithContext(ctx).
+	result := r.exchangeRepo.Db.WithContext(ctx).
 		Table("exchange_credentials").
 		Where("user_id = ? AND label = ?", userID, label).
 		Where("exchange_id IN (SELECT id FROM exchanges WHERE name = ?)", exchangeName).
@@ -300,5 +344,5 @@ func GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig) (*ExchangeResu
 	if defaultRegistry == nil {
 		return nil, fmt.Errorf("default registry not initialized")
 	}
-	return defaultRegistry.GetOrCreateExchange(ctx, cfg)
+	return defaultRegistry.GetOrCreateExchangeConfig(ctx, cfg)
 }
