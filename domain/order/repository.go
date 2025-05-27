@@ -15,7 +15,9 @@ type OrderRepository interface {
 	GetByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.OrderHistory, error)
 	GetOpenOrders(ctx context.Context, userID, exchangeCredentialID uuid.UUID) ([]models.OrderHistory, error)
 	Update(ctx context.Context, order *models.OrderHistory) error
-
+	CreateEvent(ctx context.Context, event *models.OrderEvent) error
+	GetByOrderEventID(ctx context.Context, orderHistID uuid.UUID) ([]models.OrderEvent, error)
+	EventList(ctx context.Context, limit, offset int) ([]models.OrderEvent, error)
 	//UpdateStatusWithEvent(ctx context.Context, orderID uuid.UUID,
 	//	status string, executedQty, executedPrice, commission float64,
 	//	eventType string, eventTime time.Time) error
@@ -26,19 +28,19 @@ type OrderRepository interface {
 
 }
 
-type GormOrderHistoryRepository struct {
+type GormOrderRepository struct {
 	db *gorm.DB
 }
 
-func NewGormOrderHistoryRepository(db *gorm.DB) *GormOrderHistoryRepository {
-	return &GormOrderHistoryRepository{db: db}
+func NewGormOrderHistoryRepository(db *gorm.DB) *GormOrderRepository {
+	return &GormOrderRepository{db: db}
 }
 
-func (r *GormOrderHistoryRepository) Create(ctx context.Context, order *models.OrderHistory) error {
+func (r *GormOrderRepository) Create(ctx context.Context, order *models.OrderHistory) error {
 	return r.db.WithContext(ctx).Create(order).Error
 }
 
-func (r *GormOrderHistoryRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.OrderHistory, error) {
+func (r *GormOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.OrderHistory, error) {
 	var order models.OrderHistory
 	err := r.db.WithContext(ctx).
 		Preload("User").
@@ -52,7 +54,8 @@ func (r *GormOrderHistoryRepository) GetByID(ctx context.Context, id uuid.UUID) 
 	return &order, nil
 }
 
-func (r *GormOrderHistoryRepository) GetByClientOrderID(ctx context.Context, clientOrderID string) (*models.OrderHistory, error) {
+func (r *GormOrderRepository) GetByClientOrderID(ctx context.Context, clientOrderID string) (*models.OrderHistory,
+	error) {
 	var order models.OrderHistory
 	err := r.db.WithContext(ctx).
 		Preload("User").
@@ -65,7 +68,8 @@ func (r *GormOrderHistoryRepository) GetByClientOrderID(ctx context.Context, cli
 	return &order, nil
 }
 
-func (r *GormOrderHistoryRepository) GetByExchangeOrderID(ctx context.Context, exchangeOrderID string) (*models.OrderHistory, error) {
+func (r *GormOrderRepository) GetByExchangeOrderID(ctx context.Context, exchangeOrderID string) (*models.OrderHistory,
+	error) {
 	var order models.OrderHistory
 	err := r.db.WithContext(ctx).
 		Preload("User").
@@ -78,7 +82,8 @@ func (r *GormOrderHistoryRepository) GetByExchangeOrderID(ctx context.Context, e
 	return &order, nil
 }
 
-func (r *GormOrderHistoryRepository) GetByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.OrderHistory, error) {
+func (r *GormOrderRepository) GetByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.OrderHistory,
+	error) {
 	var orders []models.OrderHistory
 	err := r.db.WithContext(ctx).
 		Preload("Exchange").
@@ -91,7 +96,9 @@ func (r *GormOrderHistoryRepository) GetByUser(ctx context.Context, userID uuid.
 	return orders, err
 }
 
-func (r *GormOrderHistoryRepository) GetOpenOrders(ctx context.Context, userID, exchangeCredentialID uuid.UUID) ([]models.OrderHistory, error) {
+func (r *GormOrderRepository) GetOpenOrders(ctx context.Context, userID, exchangeCredentialID uuid.UUID) (
+	[]models.OrderHistory,
+	error) {
 	var orders []models.OrderHistory
 	err := r.db.WithContext(ctx).
 		Preload("Exchange").
@@ -103,11 +110,12 @@ func (r *GormOrderHistoryRepository) GetOpenOrders(ctx context.Context, userID, 
 	return orders, err
 }
 
-func (r *GormOrderHistoryRepository) Update(ctx context.Context, order *models.OrderHistory) error {
+func (r *GormOrderRepository) Update(ctx context.Context, order *models.OrderHistory) error {
 	return r.db.WithContext(ctx).Save(order).Error
 }
 
-func (r *GormOrderHistoryRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, executedQty, executedPrice, commission float64) error {
+func (r *GormOrderRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, executedQty, executedPrice,
+	commission float64) error {
 	return r.db.WithContext(ctx).Model(&models.OrderHistory{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
@@ -116,4 +124,21 @@ func (r *GormOrderHistoryRepository) UpdateStatus(ctx context.Context, id uuid.U
 			"executed_price": executedPrice,
 			"commission":     commission,
 		}).Error
+}
+
+func (r *GormOrderRepository) CreateEvent(ctx context.Context, event *models.OrderEvent) error {
+	return r.db.WithContext(ctx).Create(event).Error
+}
+
+func (r *GormOrderRepository) GetByOrderEventID(ctx context.Context, orderHistID uuid.UUID) ([]models.OrderEvent, error) {
+	var events []models.OrderEvent
+	err := r.db.WithContext(ctx).Where("order_hist_id = ?", orderHistID).Order("event_time ASC").Find(&events).Error
+	return events, err
+}
+
+func (r *GormOrderRepository) EventList(ctx context.Context, limit, offset int) ([]models.OrderEvent, error) {
+	var events []models.OrderEvent
+	err := r.db.WithContext(ctx).Preload("OrderHistory").Order("recorded_at DESC").Limit(limit).Offset(offset).
+		Find(&events).Error
+	return events, err
 }

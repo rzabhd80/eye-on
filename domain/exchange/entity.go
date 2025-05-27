@@ -1,11 +1,19 @@
 package exchange
 
-import "github.com/rzabhd80/eye-on/internal/database/models"
+import (
+	"context"
+	"github.com/rzabhd80/eye-on/internal/database/models"
+)
 
 type Exchange struct {
 	exchange models.Exchange
 }
 
-type ExchangeCredential struct {
-	exchangeCredentials models.ExchangeCredential
+func (exchange *Exchange) Ping(ctx context.Context) error {
+	return nil
+}
+func (exchange *Exchange) Name() string { return exchange.Name() }
+
+func (exchange *Exchange) GetBalance(ctx context.Context) {
+
 }
