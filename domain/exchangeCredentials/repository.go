@@ -3,6 +3,7 @@ package exchangeCredentials
 import (
 	"context"
 	"github.com/google/uuid"
+	"github.com/rzabhd80/eye-on/internal/database/models"
 	"gorm.io/gorm"
 	"time"
 )
@@ -10,7 +11,7 @@ import (
 type IExchangeCredentialRepository interface {
 	Create(ctx context.Context, cred *ExchangeCredential) error
 	GetByID(ctx context.Context, id uuid.UUID) (*ExchangeCredential, error)
-	GetByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) ([]ExchangeCredential, error)
+	GetByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) ([]models.ExchangeCredential, error)
 	Update(ctx context.Context, cred *ExchangeCredential) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	UpdateLastUsed(ctx context.Context, id uuid.UUID) error
@@ -25,20 +26,22 @@ func NewGormExchangeCredentialRepository(db *gorm.DB) IExchangeCredentialReposit
 }
 
 func (r *ExchangeCredentialRepository) Create(ctx context.Context, cred *ExchangeCredential) error {
-	return r.db.WithContext(ctx).Create(cred).Error
+	return r.db.WithContext(ctx).Create(cred.exchangeCredentials).Error
 }
 
 func (r *ExchangeCredentialRepository) GetByID(ctx context.Context, id uuid.UUID) (*ExchangeCredential, error) {
 	var cred ExchangeCredential
-	err := r.db.WithContext(ctx).Preload("User").Preload("Exchange").First(&cred, "id = ?", id).Error
+	exchangeCred := cred.exchangeCredentials
+	err := r.db.WithContext(ctx).Preload("User").Preload("Exchange").First(&exchangeCred, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &cred, nil
 }
 
-func (r *ExchangeCredentialRepository) GetByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) ([]ExchangeCredential, error) {
-	var creds []ExchangeCredential
+func (r *ExchangeCredentialRepository) GetByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) (
+	[]models.ExchangeCredential, error) {
+	var creds []models.ExchangeCredential
 	err := r.db.WithContext(ctx).
 		Preload("Exchange").
 		Where("user_id = ? AND exchange_id = ?", userID, exchangeID).

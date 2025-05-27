@@ -9,7 +9,7 @@ import (
 )
 
 type BalanceSnapshotRepository interface {
-	Create(ctx context.Context, snapshot *models.BalanceSnapshot) error
+	Create(ctx context.Context, snapshot *Balance) error
 	GetLatestByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) ([]*models.BalanceSnapshot, error)
 	GetHistory(ctx context.Context, userID, exchangeID uuid.UUID, currency string, limit int) ([]*models.BalanceSnapshot, error)
 	DeleteOldSnapshots(ctx context.Context, olderThan time.Time) error
@@ -22,8 +22,8 @@ func NewGormBalanceSnapshotRepository(db *gorm.DB) *GormBalanceSnapshotRepositor
 	return &GormBalanceSnapshotRepository{db: db}
 }
 
-func (r *GormBalanceSnapshotRepository) Create(ctx context.Context, snapshot *models.BalanceSnapshot) error {
-	return r.db.WithContext(ctx).Create(snapshot).Error
+func (r *GormBalanceSnapshotRepository) Create(ctx context.Context, snapshot *Balance) error {
+	return r.db.WithContext(ctx).Create(snapshot.balance).Error
 }
 
 func (r *GormBalanceSnapshotRepository) GetLatestByUserAndExchange(ctx context.Context, userID, exchangeID uuid.UUID) (
