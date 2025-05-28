@@ -7,11 +7,12 @@ import (
 
 type ExchangeCredential struct {
 	BaseModel
-	UserID      uuid.UUID  `gorm:"type:uuid;not null" json:"user_id"`
-	ExchangeID  uuid.UUID  `gorm:"type:uuid;not null" json:"exchange_id"`
+	UserID      uuid.UUID  `gorm:"type:uuid;not null;index:idx_user_exchange" json:"user_id"`
+	ExchangeID  uuid.UUID  `gorm:"type:uuid;not null;index:idx_user_exchange" json:"exchange_id"`
 	Label       string     `gorm:"size:100;not null;default:'Default'" json:"label"`
 	APIKey      string     `gorm:"type:text;not null" json:"api_key"`
-	SecretKey   string     `gorm:"type:text;not null" json:"secret_key"`
+	SecretKey   string     `gorm:"type:text;" json:"secret_key"`
+	RefreshKey  string     `gorm:"type:text;" json:"refresh_key"`
 	Passphrase  string     `gorm:"type:text" json:"passphrase,omitempty"`
 	IsActive    bool       `gorm:"not null;default:true" json:"is_active"`
 	IsTestnet   bool       `gorm:"not null;default:false" json:"is_testnet"`

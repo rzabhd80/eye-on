@@ -12,7 +12,7 @@ import (
 
 type User struct {
 	User             models.User
-	UserRepo         UserRepository
+	UserRepo         *UserRepository
 	ExchangeRepo     *exchange.ExchangeRepository
 	ExchangeCredRepo *exchangeCredentials.ExchangeCredentialRepository
 	jwtParser        *helpers.JWTParser

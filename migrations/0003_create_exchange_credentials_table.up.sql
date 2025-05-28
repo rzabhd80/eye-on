@@ -5,8 +5,9 @@ CREATE TABLE exchange_credentials
     exchange_id UUID         NOT NULL REFERENCES exchanges (id) ON DELETE CASCADE,
     label       VARCHAR(100) NOT NULL DEFAULT 'Default',
     api_key     TEXT         NOT NULL,
-    secret_key  TEXT         NOT NULL,
+    secret_key  TEXT,
     passphrase  TEXT,
+    refresh_key TEXT,
     is_active   BOOLEAN      NOT NULL DEFAULT true,
     is_testnet  BOOLEAN      NOT NULL DEFAULT false,
     permissions JSONB,
@@ -14,5 +15,7 @@ CREATE TABLE exchange_credentials
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
     deleted_at  TIMESTAMPTZ,
-    UNIQUE (user_id, exchange_id, label) -- soft-delete not included here; assume labels remain
 );
+
+CREATE INDEX idx_exchange_credentials_user_exchange ON
+    exchange_credentials (user_id, exchange_id);
