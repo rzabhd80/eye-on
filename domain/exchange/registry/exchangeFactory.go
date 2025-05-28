@@ -10,7 +10,6 @@ import (
 	"github.com/rzabhd80/eye-on/domain/traidingPair"
 	"github.com/rzabhd80/eye-on/internal/database/models"
 	envCofig "github.com/rzabhd80/eye-on/internal/envConfig"
-	"github.com/rzabhd80/eye-on/internal/helpers"
 	"gorm.io/gorm"
 	"time"
 )
@@ -21,8 +20,8 @@ var (
 	constructors = make(map[string]Constructor)
 )
 
-// Registry manages exchange registration and creation
-type Registry struct {
+// ExchangeRegistry manages exchange registration and creation
+type ExchangeRegistry struct {
 	exchangeRepo            *exchange.ExchangeRepository
 	tradingPairRepo         *traidingPair.TradingPairRepository
 	exchangeCredentialsRepo *exchangeCredentials.ExchangeCredentialRepository
@@ -30,8 +29,8 @@ type Registry struct {
 }
 
 func NewRegistry(repo *exchange.ExchangeRepository, tradingRepo *traidingPair.TradingPairRepository,
-	exchangeCredentialsRepo *exchangeCredentials.ExchangeCredentialRepository) *Registry {
-	return &Registry{
+	exchangeCredentialsRepo *exchangeCredentials.ExchangeCredentialRepository) *ExchangeRegistry {
+	return &ExchangeRegistry{
 		exchangeRepo:            repo,
 		tradingPairRepo:         tradingRepo,
 		exchangeCredentialsRepo: exchangeCredentialsRepo,
@@ -40,7 +39,7 @@ func NewRegistry(repo *exchange.ExchangeRepository, tradingRepo *traidingPair.Tr
 }
 
 // Register is called by each adapter in its init()
-func (r *Registry) Register(name string, constructor Constructor, envConfig envCofig.AppConfig) {
+func (r *ExchangeRegistry) Register(name string, constructor Constructor) {
 	if _, dup := r.constructors[name]; dup {
 		panic("exchange " + name + " already registered")
 	}
@@ -49,16 +48,14 @@ func (r *Registry) Register(name string, constructor Constructor, envConfig envC
 
 // ExchangeResult contains both the database model and runtime instance
 type ExchangeResult struct {
-	Exchange        *models.Exchange
-	Credential      *models.ExchangeCredential
-	symbols         []traidingPair.TradingPair
-	Instance        IExchange
-	IsNewExchange   bool
-	IsNewCredential bool
+	Exchange      *models.Exchange
+	symbols       []traidingPair.TradingPair
+	Instance      IExchange
+	IsNewExchange bool
 }
 
 // GetOrCreateExchangeConfig creates or retrieves an exchange and its credentials from the database
-func (r *Registry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeConfig, envConf envCofig.AppConfig) (
+func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeConfig, envConf envCofig.AppConfig) (
 	*ExchangeResult, error) {
 
 	constructor, ok := r.constructors[cfg.Name]
@@ -105,78 +102,6 @@ func (r *Registry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeCo
 			return nil, fmt.Errorf("failed to query exchangeInstance: %w", err)
 		}
 	}
-
-	// Check if credential exists for this user and exchangeInstance
-	var credential models.ExchangeCredential
-	label := cfg.Label
-	if label == "" {
-		label = "Default"
-	}
-
-	err = tx.Where(
-		"user_id = ? AND exchange_id = ? AND label = ? AND is_active = ?",
-		cfg.UserID, exchangeInstance.ID, label, true,
-	).First(&credential).Error
-
-	isNewCredential := false
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			secretKey, err := helpers.Encrypt(cfg.SecretKey, []byte(envConf.EncryptionKey))
-			if err != nil {
-				return nil, err
-			}
-			// Create new credential
-			credential = models.ExchangeCredential{
-				BaseModel: models.BaseModel{
-					ID: uuid.New(),
-				},
-				UserID:      cfg.UserID,
-				ExchangeID:  exchangeInstance.ID,
-				Label:       label,
-				APIKey:      cfg.APIKey,
-				SecretKey:   secretKey,
-				Passphrase:  cfg.Passphrase,
-				IsActive:    true,
-				IsTestnet:   cfg.IsTestnet,
-				Permissions: models.JSONB(map[string]interface{}{}), // Initialize empty
-			}
-
-			if err := tx.Create(&credential).Error; err != nil {
-				tx.Rollback()
-				return nil, fmt.Errorf("failed to create exchangeInstance credential: %w", err)
-			}
-			isNewCredential = true
-		} else {
-			tx.Rollback()
-			return nil, fmt.Errorf("failed to query exchangeInstance credential: %w", err)
-		}
-	} else {
-		// Update existing credential if API keys have changed
-		updated := false
-		if credential.APIKey != cfg.APIKey {
-			credential.APIKey = cfg.APIKey
-			updated = true
-		}
-		if credential.SecretKey != cfg.SecretKey {
-			credential.SecretKey = cfg.SecretKey
-			updated = true
-		}
-		if credential.Passphrase != cfg.Passphrase {
-			credential.Passphrase = cfg.Passphrase
-			updated = true
-		}
-		if credential.IsTestnet != cfg.IsTestnet {
-			credential.IsTestnet = cfg.IsTestnet
-			updated = true
-		}
-
-		if updated {
-			if err := tx.Save(&credential).Error; err != nil {
-				tx.Rollback()
-				return nil, fmt.Errorf("failed to update exchangeInstance credential: %w", err)
-			}
-		}
-	}
 	//TODO!!! it should be edited to check each and every on of them
 	//setting up the symbols
 	var exchangeSymbols []string
@@ -221,23 +146,16 @@ func (r *Registry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeCo
 		return nil, fmt.Errorf("failed to create exchangeInstance instance: %w", err)
 	}
 
-	// Update last used timestamp
-	now := time.Now()
-	credential.LastUsed = &now
-	r.exchangeRepo.Db.WithContext(ctx).Save(&credential)
-
 	return &ExchangeResult{
-		Exchange:        &exchangeInstance,
-		Credential:      &credential,
-		Instance:        instance,
-		IsNewExchange:   isNewExchange,
-		IsNewCredential: isNewCredential,
-		symbols:         tradingPairs,
+		Exchange:      &exchangeInstance,
+		Instance:      instance,
+		IsNewExchange: isNewExchange,
+		symbols:       tradingPairs,
 	}, nil
 }
 
 // GetExchange retrieves an existing exchange instance without creating new records
-func (r *Registry) GetExchange(ctx context.Context, userID uuid.UUID, exchangeName, label string) (*ExchangeResult, error) {
+func (r *ExchangeRegistry) GetExchange(ctx context.Context, userID uuid.UUID, exchangeName, label string) (*ExchangeResult, error) {
 	if label == "" {
 		label = "Default"
 	}
@@ -290,16 +208,13 @@ func (r *Registry) GetExchange(ctx context.Context, userID uuid.UUID, exchangeNa
 	r.exchangeRepo.Db.WithContext(ctx).Save(&credential)
 
 	return &ExchangeResult{
-		Exchange:        &credential.Exchange,
-		Credential:      &credential,
-		Instance:        instance,
-		IsNewExchange:   false,
-		IsNewCredential: false,
+		Exchange: &credential.Exchange,
+		Instance: instance,
 	}, nil
 }
 
 // ListSupportedExchanges returns a list of registered exchange names
-func (r *Registry) ListSupportedExchanges() []string {
+func (r *ExchangeRegistry) ListSupportedExchanges() []string {
 	exchanges := make([]string, 0, len(r.constructors))
 	for name := range r.constructors {
 		exchanges = append(exchanges, name)
@@ -308,7 +223,7 @@ func (r *Registry) ListSupportedExchanges() []string {
 }
 
 // DeactivateCredential marks a credential as inactive
-func (r *Registry) DeactivateCredential(ctx context.Context, userID uuid.UUID, exchangeName, label string) error {
+func (r *ExchangeRegistry) DeactivateCredential(ctx context.Context, userID uuid.UUID, exchangeName, label string) error {
 	if label == "" {
 		label = "Default"
 	}
@@ -331,10 +246,10 @@ func (r *Registry) DeactivateCredential(ctx context.Context, userID uuid.UUID, e
 }
 
 // Global registry instance (optional, for backward compatibility)
-var defaultRegistry *Registry
+var defaultRegistry *ExchangeRegistry
 
 // SetDefaultRegistry sets the global registry instance
-func SetDefaultRegistry(registry *Registry) {
+func SetDefaultRegistry(registry *ExchangeRegistry) {
 	defaultRegistry = registry
 }
 
@@ -343,7 +258,7 @@ func Register(name string, constructor Constructor, envConf envCofig.AppConfig) 
 	if defaultRegistry == nil {
 		panic("default registry not initialized. Call SetDefaultRegistry first")
 	}
-	defaultRegistry.Register(name, constructor, envConf)
+	defaultRegistry.Register(name, constructor)
 }
 
 // GetOrCreateExchange uses the default registry
