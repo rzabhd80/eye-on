@@ -48,6 +48,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	exchangeResitery := registry.NewRegistry(&exchangeRepo, &tradingPairRepo, &exchangeCredRepo)
 
 	//TODO add exchanges
+	
 	exchangeResitery.Register("", func(cfg registry.ExchangeConfig) (registry.IExchange, error) { return nil, nil })
 
 	ctx, stp := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
