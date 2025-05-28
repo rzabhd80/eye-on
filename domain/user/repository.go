@@ -18,20 +18,20 @@ type IUserRepository interface {
 }
 
 type UserRepository struct {
-	db *gorm.DB
+	Db *gorm.DB
 }
 
 func NewGormUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db}
+	return &UserRepository{Db: db}
 }
 
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
-	return r.db.WithContext(ctx).Create(user).Error
+	return r.Db.WithContext(ctx).Create(user).Error
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	var user User
-	err := r.db.WithContext(ctx).First(&user, "id = ?", id).Error
+	err := r.Db.WithContext(ctx).First(&user, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*User, erro
 
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
 	var user models.User
-	err := r.db.WithContext(ctx).First(&user, "username = ?", username).Error
+	err := r.Db.WithContext(ctx).First(&user, "username = ?", username).Error
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
 	var user User
-	err := r.db.WithContext(ctx).First(&user, "email = ?", email).Error
+	err := r.Db.WithContext(ctx).First(&user, "email = ?", email).Error
 	if err != nil {
 		return nil, err
 	}
@@ -57,15 +57,15 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, e
 }
 
 func (r *UserRepository) Update(ctx context.Context, user *User) error {
-	return r.db.WithContext(ctx).Save(user).Error
+	return r.Db.WithContext(ctx).Save(user).Error
 }
 
 func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&User{}, id).Error
+	return r.Db.WithContext(ctx).Delete(&User{}, id).Error
 }
 
 func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]User, error) {
 	var users []User
-	err := r.db.WithContext(ctx).Limit(limit).Offset(offset).Find(&users).Error
+	err := r.Db.WithContext(ctx).Limit(limit).Offset(offset).Find(&users).Error
 	return users, err
 }

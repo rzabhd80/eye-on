@@ -2,19 +2,12 @@ package registry
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"github.com/rzabhd80/eye-on/domain/balance"
 	"github.com/rzabhd80/eye-on/domain/order"
 	"github.com/rzabhd80/eye-on/domain/orderBook"
 	"time"
 )
 
-type RetryConfig struct {
-	MaxAttempts int
-	BaseDelay   time.Duration
-	MaxDelay    time.Duration
-	Multiplier  float64
-}
 type Symbol struct {
 	Symbol     string
 	BaseAsset  string
@@ -24,16 +17,9 @@ type ExchangeConfig struct {
 	Name        string
 	DisplayName string
 	BaseURL     string
-	APIKey      string
-	SecretKey   string
-	RefreshKey  string
-	Passphrase  string
-	IsTestnet   bool
 	RateLimit   int
 	Timeout     time.Duration
-	RetryConfig RetryConfig
 	Features    map[string]interface{} // Will be stored as JSONB
-	UserID      uuid.UUID              // Required for ExchangeCredential
 	Label       string                 // defaults to "Default"
 	symbols     []Symbol
 }

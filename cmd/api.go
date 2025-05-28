@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rzabhd80/eye-on/api/bitpin"
 	"github.com/rzabhd80/eye-on/domain/exchange"
 	"github.com/rzabhd80/eye-on/domain/exchange/registry"
 	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
 	"github.com/rzabhd80/eye-on/domain/traidingPair"
+	"github.com/rzabhd80/eye-on/domain/user"
 	db "github.com/rzabhd80/eye-on/internal/database"
 	"github.com/rzabhd80/eye-on/internal/envConfig"
 	"github.com/urfave/cli/v2"
@@ -46,10 +48,28 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	}
 
 	exchangeResitery := registry.NewRegistry(&exchangeRepo, &tradingPairRepo, &exchangeCredRepo)
+	registry.SetDefaultRegistry(exchangeResitery)
 
-	//TODO add exchanges
-	
-	exchangeResitery.Register("", func(cfg registry.ExchangeConfig) (registry.IExchange, error) { return nil, nil })
+	userRepo := user.UserRepository{
+		Db: psqlDb.GormDb,
+	}
+	registry.GetOrCreateExchange(cntx.Context, registry.ExchangeConfig{
+		Name:        "bitpint",
+		DisplayName: "bitpin",
+		BaseURL:     "https://api.bitpin.ir",
+		RateLimit:   0,
+		Timeout:     0,
+		Features:    nil,
+		Label:       "",
+	})
+	registry.Register("bitpin", func(cfg registry.ExchangeConfig) (registry.IExchange, error) {
+		bitpintExhcnage := bitpin.BitpinExchange{
+			ExchangeRepo:           &exchangeRepo,
+			ExchangeCredentialRepo: &exchangeCredRepo,
+			UserREpo:               &userRepo,
+		}
+		return &bitpintExhcnage, nil
+	})
 
 	ctx, stp := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	app := fiber.New()

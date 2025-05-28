@@ -85,19 +85,18 @@ func (user *User) CreateExchangeCredential(ctx context.Context, request Exchange
 	}
 	encryptedSecretKey := hex.EncodeToString([]byte(request.SecretKey))
 	encryptedPassphrase := ""
-	if request.Passphrase != "" {
-		encryptedPassphrase = hex.EncodeToString([]byte(request.Passphrase))
+	if request.AccessKey != "" {
+		encryptedPassphrase = hex.EncodeToString([]byte(request.AccessKey))
 	}
 	credential := models.ExchangeCredential{
-		UserID:      userId,
-		ExchangeID:  exchangeReg.ID,
-		Label:       request.Label,
-		APIKey:      request.APIKey,
-		SecretKey:   encryptedSecretKey,
-		Passphrase:  encryptedPassphrase,
-		IsActive:    true,
-		IsTestnet:   request.IsTestnet,
-		Permissions: request.Permissions,
+		UserID:     userId,
+		ExchangeID: exchangeReg.ID,
+		Label:      request.Label,
+		APIKey:     request.APIKey,
+		SecretKey:  encryptedSecretKey,
+		AccessKey:  encryptedPassphrase,
+		IsActive:   true,
+		IsTestnet:  request.IsTestnet,
 	}
 	err = user.ExchangeCredRepo.Create(ctx, &credential)
 	if err != nil {

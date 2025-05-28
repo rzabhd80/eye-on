@@ -9,9 +9,7 @@ import (
 	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
 	"github.com/rzabhd80/eye-on/domain/traidingPair"
 	"github.com/rzabhd80/eye-on/internal/database/models"
-	envCofig "github.com/rzabhd80/eye-on/internal/envConfig"
 	"gorm.io/gorm"
-	"time"
 )
 
 type Constructor func(cfg ExchangeConfig) (IExchange, error)
@@ -54,8 +52,8 @@ type ExchangeResult struct {
 	IsNewExchange bool
 }
 
-// GetOrCreateExchangeConfig creates or retrieves an exchange and its credentials from the database
-func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeConfig, envConf envCofig.AppConfig) (
+// GetOrCreateExchangeConfig creates or retrieves an exchange
+func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeConfig) (
 	*ExchangeResult, error) {
 
 	constructor, ok := r.constructors[cfg.Name]
@@ -154,65 +152,6 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 	}, nil
 }
 
-// GetExchange retrieves an existing exchange instance without creating new records
-func (r *ExchangeRegistry) GetExchange(ctx context.Context, userID uuid.UUID, exchangeName, label string) (*ExchangeResult, error) {
-	if label == "" {
-		label = "Default"
-	}
-
-	constructor, ok := r.constructors[exchangeName]
-	if !ok {
-		return nil, fmt.Errorf("exchange %s not supported", exchangeName)
-	}
-
-	// Query with joins to get both exchange and credential info
-	var credential models.ExchangeCredential
-	err := r.exchangeRepo.Db.WithContext(ctx).
-		Preload("Exchange").
-		Where("user_id = ? AND label = ? AND is_active = ?", userID, label, true).
-		Joins("JOIN exchanges ON exchanges.id = exchange_credentials.exchange_id").
-		Where("exchanges.name = ? AND exchanges.is_active = ?", exchangeName, true).
-		First(&credential).Error
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("exchange credential not found for user %s, exchange %s, label %s", userID, exchangeName, label)
-		}
-		return nil, fmt.Errorf("failed to query exchange credential: %w", err)
-	}
-
-	// Create exchange config from stored data
-	cfg := ExchangeConfig{
-		Name:        credential.Exchange.Name,
-		DisplayName: credential.Exchange.DisplayName,
-		BaseURL:     credential.Exchange.BaseURL,
-		APIKey:      credential.APIKey,
-		SecretKey:   credential.SecretKey,
-		RefreshKey:  credential.RefreshKey,
-		Passphrase:  credential.Passphrase,
-		IsTestnet:   credential.IsTestnet,
-		RateLimit:   credential.Exchange.RateLimit,
-		UserID:      credential.UserID,
-		Label:       credential.Label,
-	}
-
-	// Create the exchange instance
-	instance, err := constructor(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create exchange instance: %w", err)
-	}
-
-	// Update last used timestamp
-	now := time.Now()
-	credential.LastUsed = &now
-	r.exchangeRepo.Db.WithContext(ctx).Save(&credential)
-
-	return &ExchangeResult{
-		Exchange: &credential.Exchange,
-		Instance: instance,
-	}, nil
-}
-
 // ListSupportedExchanges returns a list of registered exchange names
 func (r *ExchangeRegistry) ListSupportedExchanges() []string {
 	exchanges := make([]string, 0, len(r.constructors))
@@ -222,16 +161,14 @@ func (r *ExchangeRegistry) ListSupportedExchanges() []string {
 	return exchanges
 }
 
-// Global registry instance (optional, for backward compatibility)
 var defaultRegistry *ExchangeRegistry
 
-// SetDefaultRegistry sets the global registry instance
 func SetDefaultRegistry(registry *ExchangeRegistry) {
 	defaultRegistry = registry
 }
 
 // Register registers an exchange constructor in the default registry
-func Register(name string, constructor Constructor, envConf envCofig.AppConfig) {
+func Register(name string, constructor Constructor) {
 	if defaultRegistry == nil {
 		panic("default registry not initialized. Call SetDefaultRegistry first")
 	}
@@ -239,9 +176,9 @@ func Register(name string, constructor Constructor, envConf envCofig.AppConfig) 
 }
 
 // GetOrCreateExchange uses the default registry
-func GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig, envConf envCofig.AppConfig) (*ExchangeResult, error) {
+func GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig) (*ExchangeResult, error) {
 	if defaultRegistry == nil {
 		return nil, fmt.Errorf("default registry not initialized")
 	}
-	return defaultRegistry.GetOrCreateExchangeConfig(ctx, cfg, envConf)
+	return defaultRegistry.GetOrCreateExchangeConfig(ctx, cfg)
 }
