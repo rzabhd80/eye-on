@@ -26,6 +26,7 @@ type ExchangeConfig struct {
 	BaseURL     string
 	APIKey      string
 	SecretKey   string
+	RefreshKey  string
 	Passphrase  string
 	IsTestnet   bool
 	RateLimit   int

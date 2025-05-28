@@ -270,6 +270,7 @@ func (r *Registry) GetExchange(ctx context.Context, userID uuid.UUID, exchangeNa
 		BaseURL:     credential.Exchange.BaseURL,
 		APIKey:      credential.APIKey,
 		SecretKey:   credential.SecretKey,
+		RefreshKey:  credential.RefreshKey,
 		Passphrase:  credential.Passphrase,
 		IsTestnet:   credential.IsTestnet,
 		RateLimit:   credential.Exchange.RateLimit,
