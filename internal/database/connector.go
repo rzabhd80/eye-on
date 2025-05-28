@@ -1,4 +1,4 @@
-package postgresDB
+package database
 
 import (
 	"database/sql"
@@ -7,11 +7,14 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/rzabhd80/eye-on/internal/envConfig"
+	psql "gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 type Database struct {
-	db  *sql.DB
-	cfg *envCofig.AppConfig
+	Db     *sql.DB
+	cfg    *envCofig.AppConfig
+	GormDb *gorm.DB
 }
 
 func NewDatabase(config *envCofig.AppConfig) (*Database, error) {
@@ -27,13 +30,13 @@ func NewDatabase(config *envCofig.AppConfig) (*Database, error) {
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
-
-	database := &Database{db: db, cfg: config}
+	gormDb, err := gorm.Open(psql.Open(dsn), &gorm.Config{})
+	database := &Database{Db: db, cfg: config, GormDb: gormDb}
 	return database, nil
 }
 
 func (database *Database) Migrate() error {
-	driver, err := postgres.WithInstance(database.db, &postgres.Config{})
+	driver, err := postgres.WithInstance(database.Db, &postgres.Config{})
 	if err != nil {
 		return fmt.Errorf("migrate driver: %w", err)
 	}
@@ -50,7 +53,7 @@ func (database *Database) Migrate() error {
 }
 
 func (db *Database) Close() error {
-	err := db.db.Close()
+	err := db.Db.Close()
 	if err != nil {
 		return err
 	}

@@ -222,29 +222,6 @@ func (r *ExchangeRegistry) ListSupportedExchanges() []string {
 	return exchanges
 }
 
-// DeactivateCredential marks a credential as inactive
-func (r *ExchangeRegistry) DeactivateCredential(ctx context.Context, userID uuid.UUID, exchangeName, label string) error {
-	if label == "" {
-		label = "Default"
-	}
-
-	result := r.exchangeRepo.Db.WithContext(ctx).
-		Table("exchange_credentials").
-		Where("user_id = ? AND label = ?", userID, label).
-		Where("exchange_id IN (SELECT id FROM exchanges WHERE name = ?)", exchangeName).
-		Update("is_active", false)
-
-	if result.Error != nil {
-		return fmt.Errorf("failed to deactivate credential: %w", result.Error)
-	}
-
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("credential not found")
-	}
-
-	return nil
-}
-
 // Global registry instance (optional, for backward compatibility)
 var defaultRegistry *ExchangeRegistry
 

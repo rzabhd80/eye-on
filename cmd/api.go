@@ -3,6 +3,11 @@ package main
 import (
 	"context"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rzabhd80/eye-on/domain/exchange"
+	"github.com/rzabhd80/eye-on/domain/exchange/registry"
+	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
+	"github.com/rzabhd80/eye-on/domain/traidingPair"
+	db "github.com/rzabhd80/eye-on/internal/database"
 	"github.com/rzabhd80/eye-on/internal/envConfig"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
@@ -22,14 +27,28 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 		return err
 	}
 
-	//psqlDb, err := postgresDB.NewDatabase(devConf)
-	//if err != nil {
-	//	return err
-	//}
-	//err = psqlDb.Migrate()
-	//if err != nil {
-	//	return err
-	//}
+	psqlDb, err := db.NewDatabase(devConf)
+	if err != nil {
+		return err
+	}
+	err = psqlDb.Migrate()
+	if err != nil {
+		return err
+	}
+	exchangeRepo := exchange.ExchangeRepository{
+		Db: psqlDb.GormDb,
+	}
+
+	tradingPairRepo := traidingPair.TradingPairRepository{DB: psqlDb.GormDb}
+
+	exchangeCredRepo := exchangeCredentials.ExchangeCredentialRepository{
+		Db: psqlDb.GormDb,
+	}
+
+	exchangeResitery := registry.NewRegistry(&exchangeRepo, &tradingPairRepo, &exchangeCredRepo)
+
+	//TODO add exchanges
+	exchangeResitery.Register("", func(cfg registry.ExchangeConfig) (registry.IExchange, error) { return nil, nil })
 
 	ctx, stp := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	app := fiber.New()
