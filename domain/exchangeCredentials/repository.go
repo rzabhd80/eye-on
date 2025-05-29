@@ -21,7 +21,7 @@ type ExchangeCredentialRepository struct {
 	Db *gorm.DB
 }
 
-func NewGormExchangeCredentialRepository(db *gorm.DB) IExchangeCredentialRepository {
+func NewExchangeCredentialRepository(db *gorm.DB) *ExchangeCredentialRepository {
 	return &ExchangeCredentialRepository{Db: db}
 }
 

@@ -100,20 +100,28 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 			return nil, fmt.Errorf("failed to query exchangeInstance: %w", err)
 		}
 	}
-	//TODO!!! it should be edited to check each and every on of them
+
+	symbols := cfg.SymbolFactory.RegisterExchangeSymbols(&exchangeInstance)
 	//setting up the symbols
 	var exchangeSymbols []string
-	for _, symbol := range cfg.symbols {
+	for _, symbol := range *symbols {
 		exchangeSymbols = append(exchangeSymbols, symbol.Symbol)
 	}
+
 	tradingPairs, err := r.tradingPairRepo.GetSymbolsList(ctx, exchangeInstance.ID, true, exchangeSymbols)
+
 	if err != nil {
 		return nil, err
 	}
-	if len(tradingPairs) != len(cfg.symbols) {
-		var newPairs []models.TradingPair
+	existingPairsMap := make(map[string]bool, len(*tradingPairs))
 
-		for _, symbolPair := range cfg.symbols {
+	for _, pair := range *tradingPairs {
+		existingPairsMap[pair.Symbol] = true
+	}
+
+	var newPairs []models.TradingPair
+	for _, symbolPair := range *symbols {
+		if !existingPairsMap[symbolPair.Symbol] {
 			tradingPair := models.TradingPair{
 				BaseModel: models.BaseModel{
 					ID: uuid.New(),
@@ -125,12 +133,12 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 			}
 			errPair := r.tradingPairRepo.Create(ctx, &tradingPair)
 			if errPair != nil {
-				return nil, errPair
+				return nil, fmt.Errorf("failed to create tradingPair for symbol %s: %w", symbolPair.Symbol, errPair)
 			}
 			newPairs = append(newPairs, tradingPair)
 		}
-
 	}
+
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
@@ -146,7 +154,7 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 		Exchange:      &exchangeInstance,
 		Instance:      instance,
 		IsNewExchange: isNewExchange,
-		symbols:       tradingPairs,
+		symbols:       *tradingPairs,
 	}, nil
 }
 

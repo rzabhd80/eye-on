@@ -18,7 +18,7 @@ type Claims struct {
 }
 
 type JWTParser struct {
-	envConf *envCofig.AppConfig
+	EnvConf *envCofig.AppConfig
 }
 
 func (jwtParser *JWTParser) GenerateSecureKey() []byte {
@@ -40,13 +40,13 @@ func (jwtParser *JWTParser) GenerateJWT(userInstance *models.User) (string, erro
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtParser.envConf.JWTKey)
+	return token.SignedString(jwtParser.EnvConf.JWTKey)
 }
 
 func (jwtParser *JWTParser) ParseJWT(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtParser.envConf.JWTKey, nil
+		return jwtParser.EnvConf.JWTKey, nil
 	})
 
 	if err != nil {

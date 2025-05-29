@@ -27,7 +27,7 @@ type BitpinExchange struct {
 	ExchangeCredentialRepo *exchangeCredentials.ExchangeCredentialRepository
 	UserRepo               *user.UserRepository
 	TradingPairRepo        *traidingPair.TradingPairRepository
-	OrderRepo              *order.GormOrderRepository
+	OrderRepo              *order.OrderRepository
 	OrderBookRepo          *orderBook.OrderBookSnapshotRepository
 	BalanceRepo            *balance.BalanceSnapshotRepository
 	Request                helpers.Request

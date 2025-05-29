@@ -5,7 +5,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/rzabhd80/eye-on/domain/order"
 	"github.com/rzabhd80/eye-on/internal/database/models"
-	"time"
 )
 
 type Symbol struct {
@@ -14,16 +13,17 @@ type Symbol struct {
 	QuoteAsset string
 }
 type ExchangeConfig struct {
-	Name        string
-	DisplayName string
-	BaseURL     string
-	RateLimit   int
-	Timeout     time.Duration
-	Features    map[string]interface{} // Will be stored as JSONB
-	Label       string                 // defaults to "Default"
-	Symbols     []models.TradingPair
+	Name          string
+	DisplayName   string
+	BaseURL       string
+	RateLimit     int
+	Features      map[string]interface{} // Will be stored as JSONB
+	SymbolFactory ISymbolFactory
 }
 
+type ISymbolFactory interface {
+	RegisterExchangeSymbols(bitpinExchange *models.Exchange) *[]models.TradingPair
+}
 type IExchange interface {
 	Name() string
 	Ping(ctx context.Context) error

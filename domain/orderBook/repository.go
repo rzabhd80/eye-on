@@ -19,7 +19,7 @@ type OrderBookSnapshotRepository struct {
 	db *gorm.DB
 }
 
-func NewGormOrderBookSnapshotRepository(db *gorm.DB) *OrderBookSnapshotRepository {
+func NewOrderBookSnapshotRepository(db *gorm.DB) *OrderBookSnapshotRepository {
 	return &OrderBookSnapshotRepository{db: db}
 }
 

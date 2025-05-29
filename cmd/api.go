@@ -7,16 +7,18 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rzabhd80/eye-on/api/bitpin"
 	"github.com/rzabhd80/eye-on/api/nobitex"
-	user2 "github.com/rzabhd80/eye-on/api/user"
+	userService "github.com/rzabhd80/eye-on/api/user"
+	"github.com/rzabhd80/eye-on/domain/balance"
 	"github.com/rzabhd80/eye-on/domain/exchange"
-	bitpin2 "github.com/rzabhd80/eye-on/domain/exchange/bitpin"
+	bitpinEntity "github.com/rzabhd80/eye-on/domain/exchange/bitpin"
 	nobitexEntity "github.com/rzabhd80/eye-on/domain/exchange/nobitex"
 	"github.com/rzabhd80/eye-on/domain/exchange/registry"
 	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
+	"github.com/rzabhd80/eye-on/domain/order"
+	"github.com/rzabhd80/eye-on/domain/orderBook"
 	"github.com/rzabhd80/eye-on/domain/traidingPair"
 	"github.com/rzabhd80/eye-on/domain/user"
 	db "github.com/rzabhd80/eye-on/internal/database"
-	"github.com/rzabhd80/eye-on/internal/database/models"
 	"github.com/rzabhd80/eye-on/internal/envConfig"
 	"github.com/rzabhd80/eye-on/internal/helpers"
 	"github.com/rzabhd80/eye-on/internal/redis"
@@ -41,7 +43,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	psqlDb, err := db.NewDatabase(devConf)
 	redisConn := redis.RedisConnection{EnvConf: devConf}
 	appRedisClient := redisConn.NewRedisClient()
-	jwtParser := helpers.JWTParser{&devConf}
+	jwtParser := helpers.JWTParser{EnvConf: devConf}
 	request := helpers.Request{}
 
 	defer func(redisCLient *redis2.Client) {
@@ -67,52 +69,52 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	if err != nil {
 		return err
 	}
-	exchangeRepo := exchange.ExchangeRepository{
-		Db: psqlDb.GormDb,
-	}
+	exchangeRepo := exchange.NewExchangeRepository(psqlDb.GormDb)
 
 	tradingPairRepo := traidingPair.TradingPairRepository{DB: psqlDb.GormDb}
 
-	exchangeCredRepo := exchangeCredentials.ExchangeCredentialRepository{
-		Db: psqlDb.GormDb,
-	}
+	exchangeCredRepo := exchangeCredentials.NewExchangeCredentialRepository(psqlDb.GormDb)
+	orderRepo := order.NewOrderHistoryRepository(psqlDb.GormDb)
+	orderBookRepo := orderBook.NewOrderBookSnapshotRepository(psqlDb.GormDb)
+	balanceRepo := balance.NewBalanceSnapshotRepository(psqlDb.GormDb)
 
-	exchangeRegistery := registry.NewRegistry(&exchangeRepo, &tradingPairRepo, &exchangeCredRepo)
+	exchangeRegistery := registry.NewRegistry(exchangeRepo, &tradingPairRepo, exchangeCredRepo)
 
 	registry.SetDefaultRegistry(exchangeRegistery)
+	
+	bitpinSymbolRegistry := bitpinEntity.BitpinSymbolRegistry{}
+	NobitexSymbolRegistry := nobitexEntity.NobitexSymbolRegistry{}
 
 	bitpinExchange, err := registry.GetOrCreateExchange(ctx, registry.ExchangeConfig{
-		Name:        "bitpint",
-		DisplayName: "bitpin",
-		BaseURL:     "https://api.bitpin.ir",
-		RateLimit:   0,
-		Timeout:     0,
-		Features:    nil,
-		Label:       "",
-		Symbols:     []models.TradingPair{},
-	})
-	nobitexExchange, err := registry.GetOrCreateExchange(ctx, registry.ExchangeConfig{
-		Name:        "nobitex",
-		DisplayName: "nobitex",
-		BaseURL:     "https://api.nobitex.ir/v3",
-		RateLimit:   0,
-		Timeout:     0,
-		Features:    nil,
-		Label:       "",
-		Symbols:     []models.TradingPair{},
+		Name:          "bitpint",
+		DisplayName:   "bitpin",
+		BaseURL:       "https://api.bitpin.ir",
+		RateLimit:     0,
+		Features:      nil,
+		SymbolFactory: &bitpinSymbolRegistry,
 	})
 
-	userRepo := user.UserRepository{
-		Db: psqlDb.GormDb,
+	nobitexExchange, err := registry.GetOrCreateExchange(ctx, registry.ExchangeConfig{
+		Name:          "nobitex",
+		DisplayName:   "nobitex",
+		BaseURL:       "https://api.nobitex.ir/v3",
+		RateLimit:     0,
+		Features:      nil,
+		SymbolFactory: &NobitexSymbolRegistry,
+	})
+	if err != nil {
+		return err
 	}
+
+	userRepo := user.NewUserRepository(psqlDb.GormDb)
 
 	app := fiber.New()
 
-	userRouter := user2.Router{
-		Service: &user2.UserAuthService{User: &user.User{
-			UserRepo:         &userRepo,
-			ExchangeRepo:     &exchangeRepo,
-			ExchangeCredRepo: &exchangeCredRepo,
+	userRouter := userService.Router{
+		Service: &userService.UserAuthService{User: &user.User{
+			UserRepo:         userRepo,
+			ExchangeRepo:     exchangeRepo,
+			ExchangeCredRepo: exchangeCredRepo,
 		}},
 	}
 
@@ -120,13 +122,13 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 		Service: &nobitex.NobitexService{
 			Exchange: &nobitexEntity.NobitexExchange{
 				NobitexExchangeModel:   nobitexExchange.Exchange,
-				ExchangeRepo:           &exchangeRepo,
-				ExchangeCredentialRepo: &exchangeCredRepo,
-				UserRepo:               &userRepo,
-				TradingPairRepo:        nil,
-				OrderRepo:              nil,
-				OrderBookRepo:          nil,
-				BalanceRepo:            nil,
+				ExchangeRepo:           exchangeRepo,
+				ExchangeCredentialRepo: exchangeCredRepo,
+				UserRepo:               userRepo,
+				TradingPairRepo:        &tradingPairRepo,
+				OrderRepo:              orderRepo,
+				OrderBookRepo:          orderBookRepo,
+				BalanceRepo:            balanceRepo,
 				Request:                request,
 			},
 		},
@@ -134,26 +136,25 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	}
 	bitpinRouter := bitpin.Router{
 		Service: &bitpin.BitpinService{
-			Exchange: &bitpin2.BitpinExchange{
-				BitpinExchangeModel:    nil,
-				ExchangeRepo:           nil,
-				ExchangeCredentialRepo: nil,
-				UserRepo:               nil,
-				TradingPairRepo:        nil,
-				OrderRepo:              nil,
-				OrderBookRepo:          nil,
-				BalanceRepo:            nil,
+			Exchange: &bitpinEntity.BitpinExchange{
+				BitpinExchangeModel:    bitpinExchange.Exchange,
+				ExchangeRepo:           exchangeRepo,
+				ExchangeCredentialRepo: exchangeCredRepo,
+				UserRepo:               userRepo,
+				TradingPairRepo:        &tradingPairRepo,
+				OrderRepo:              orderRepo,
+				OrderBookRepo:          orderBookRepo,
+				BalanceRepo:            balanceRepo,
 				Request:                helpers.Request{},
 			},
 		},
 		Parser: &jwtParser,
 	}
-	if err != nil {
-		return err
-	}
 
 	//Register your routes here
 	userRouter.SetUserRouter(app)
+	bitpinRouter.SetUserRouter(app)
+	nobitexRouter.SetUserRouter(app)
 
 	ctx, stp := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 
@@ -170,10 +171,10 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	// Shutdown with timeout
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
-	//err = psqlDb.Close()
-	//if err != nil {
-	//	return err
-	//}
+	err = psqlDb.Close()
+	if err != nil {
+		return err
+	}
 	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
 		logger.Fatal("Server shutdown error: %v", zap.String("error", err.Error()))
 		return err

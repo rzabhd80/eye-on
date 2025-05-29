@@ -29,7 +29,7 @@ func (r *ExchangeRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 	return &config, nil
 }
 
-func NewExchangeRepository(db *gorm.DB) IExchangeRepository {
+func NewExchangeRepository(db *gorm.DB) *ExchangeRepository {
 	return &ExchangeRepository{Db: db}
 }
 

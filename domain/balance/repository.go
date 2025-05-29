@@ -18,7 +18,7 @@ type BalanceSnapshotRepository struct {
 	db *gorm.DB
 }
 
-func NewGormBalanceSnapshotRepository(db *gorm.DB) *BalanceSnapshotRepository {
+func NewBalanceSnapshotRepository(db *gorm.DB) *BalanceSnapshotRepository {
 	return &BalanceSnapshotRepository{db: db}
 }
 
