@@ -12,8 +12,8 @@ type Router struct {
 }
 
 func (router *Router) SetUserRouter(fiberRouter fiber.Router) {
-	fiberRouter.Group("/exchange/bitpin")
-	fiberRouter.Use(middleware.JWTAuthMiddleware(*router.Service.exchange.UserRepo, *router.Parser))
+	fiberRouter.Group("/Exchange/bitpin")
+	fiberRouter.Use(middleware.JWTAuthMiddleware(*router.Service.Exchange.UserRepo, *router.Parser))
 	fiberRouter.Post("/order", router.Service.PlaceOrder)
 	fiberRouter.Delete("/order", router.Service.cancelOrder)
 	fiberRouter.Delete("/orderBook", router.Service.GetOrderBook)

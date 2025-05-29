@@ -18,7 +18,7 @@ type Claims struct {
 }
 
 type JWTParser struct {
-	envConf envCofig.AppConfig
+	envConf *envCofig.AppConfig
 }
 
 func (jwtParser *JWTParser) GenerateSecureKey() []byte {

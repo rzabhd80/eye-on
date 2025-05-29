@@ -5,14 +5,20 @@ import (
 	"fmt"
 	redis2 "github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rzabhd80/eye-on/api/bitpin"
+	"github.com/rzabhd80/eye-on/api/nobitex"
 	user2 "github.com/rzabhd80/eye-on/api/user"
 	"github.com/rzabhd80/eye-on/domain/exchange"
+	bitpin2 "github.com/rzabhd80/eye-on/domain/exchange/bitpin"
+	nobitexEntity "github.com/rzabhd80/eye-on/domain/exchange/nobitex"
 	"github.com/rzabhd80/eye-on/domain/exchange/registry"
 	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
 	"github.com/rzabhd80/eye-on/domain/traidingPair"
 	"github.com/rzabhd80/eye-on/domain/user"
 	db "github.com/rzabhd80/eye-on/internal/database"
+	"github.com/rzabhd80/eye-on/internal/database/models"
 	"github.com/rzabhd80/eye-on/internal/envConfig"
+	"github.com/rzabhd80/eye-on/internal/helpers"
 	"github.com/rzabhd80/eye-on/internal/redis"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
@@ -34,7 +40,9 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 
 	psqlDb, err := db.NewDatabase(devConf)
 	redisConn := redis.RedisConnection{EnvConf: devConf}
-	redisCLient := redisConn.NewRedisClient()
+	appRedisClient := redisConn.NewRedisClient()
+	jwtParser := helpers.JWTParser{&devConf}
+	request := helpers.Request{}
 
 	defer func(redisCLient *redis2.Client) {
 		err := redisCLient.Close()
@@ -42,13 +50,13 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 
 		}
 
-	}(redisCLient)
+	}(appRedisClient)
 	if err != nil {
 		return err
 	}
 	// Test connection
 	ctxRedis := context.Background()
-	pong, err := redisCLient.Ping(ctxRedis).Result()
+	pong, err := appRedisClient.Ping(ctxRedis).Result()
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
@@ -81,6 +89,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 		Timeout:     0,
 		Features:    nil,
 		Label:       "",
+		Symbols:     []models.TradingPair{},
 	})
 	nobitexExchange, err := registry.GetOrCreateExchange(ctx, registry.ExchangeConfig{
 		Name:        "nobitex",
@@ -90,11 +99,9 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 		Timeout:     0,
 		Features:    nil,
 		Label:       "",
+		Symbols:     []models.TradingPair{},
 	})
 
-	if err != nil {
-		return err
-	}
 	userRepo := user.UserRepository{
 		Db: psqlDb.GormDb,
 	}
@@ -107,6 +114,42 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 			ExchangeRepo:     &exchangeRepo,
 			ExchangeCredRepo: &exchangeCredRepo,
 		}},
+	}
+
+	nobitexRouter := nobitex.Router{
+		Service: &nobitex.NobitexService{
+			Exchange: &nobitexEntity.NobitexExchange{
+				NobitexExchangeModel:   nobitexExchange.Exchange,
+				ExchangeRepo:           &exchangeRepo,
+				ExchangeCredentialRepo: &exchangeCredRepo,
+				UserRepo:               &userRepo,
+				TradingPairRepo:        nil,
+				OrderRepo:              nil,
+				OrderBookRepo:          nil,
+				BalanceRepo:            nil,
+				Request:                request,
+			},
+		},
+		Parser: &jwtParser,
+	}
+	bitpinRouter := bitpin.Router{
+		Service: &bitpin.BitpinService{
+			Exchange: &bitpin2.BitpinExchange{
+				BitpinExchangeModel:    nil,
+				ExchangeRepo:           nil,
+				ExchangeCredentialRepo: nil,
+				UserRepo:               nil,
+				TradingPairRepo:        nil,
+				OrderRepo:              nil,
+				OrderBookRepo:          nil,
+				BalanceRepo:            nil,
+				Request:                helpers.Request{},
+			},
+		},
+		Parser: &jwtParser,
+	}
+	if err != nil {
+		return err
 	}
 
 	//Register your routes here

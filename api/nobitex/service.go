@@ -12,7 +12,7 @@ import (
 )
 
 type NobitexService struct {
-	exchange *nobitex.NobitexExchange
+	Exchange *nobitex.NobitexExchange
 }
 
 func (service *NobitexService) GetBalance(c *fiber.Ctx) error {
@@ -21,7 +21,7 @@ func (service *NobitexService) GetBalance(c *fiber.Ctx) error {
 	if err := c.ParamsParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "Bad Request Format"})
 	}
-	balanceSnapshots, err := service.exchange.GetBalance(c.Context(), userId, &request.Asset)
+	balanceSnapshots, err := service.Exchange.GetBalance(c.Context(), userId, &request.Asset)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
 	}
@@ -48,7 +48,7 @@ func (service *NobitexService) GetOrderBook(c *fiber.Ctx) error {
 	if err := c.ParamsParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "Bad Request Format"})
 	}
-	orderBookHistory, err := service.exchange.GetOrderBook(c.Context(), request.Symbol, userId)
+	orderBookHistory, err := service.Exchange.GetOrderBook(c.Context(), request.Symbol, userId)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
 	}
@@ -67,7 +67,7 @@ func (service *NobitexService) PlaceOrder(c *fiber.Ctx) error {
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "Bad Request Format"})
 	}
-	orderHistory, err := service.exchange.PlaceOrder(c.Context(), &request, userId)
+	orderHistory, err := service.Exchange.PlaceOrder(c.Context(), &request, userId)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
 	}
@@ -96,7 +96,7 @@ func (service *NobitexService) cancelOrder(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
 	}
-	resultErr := service.exchange.CancelOrder(c.Context(), orderId, userId)
+	resultErr := service.Exchange.CancelOrder(c.Context(), orderId, userId)
 	if resultErr != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
 	}

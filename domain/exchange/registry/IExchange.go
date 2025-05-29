@@ -21,7 +21,7 @@ type ExchangeConfig struct {
 	Timeout     time.Duration
 	Features    map[string]interface{} // Will be stored as JSONB
 	Label       string                 // defaults to "Default"
-	symbols     []Symbol
+	Symbols     []models.TradingPair
 }
 
 type IExchange interface {
