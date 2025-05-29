@@ -1,20 +1,31 @@
 package orderBook
 
-import "github.com/rzabhd80/eye-on/internal/database/models"
+import (
+	"github.com/rzabhd80/eye-on/internal/database/models"
+	"time"
+)
 
 type GetOrderBookRequest struct {
 	Symbol string `json:"symbol"`
 	Limit  int    `json:"limit,omitempty"` // Number of price levels, defaults to 100
 }
 
-type OrderBookSchema struct {
-	Price    string `json:"price"`
-	Quantity string `json:"quantity"`
+type StandardOrderBookRequest struct {
+	Symbol    string               `json:"symbol"`
+	Bids      []StandardOrderLevel `json:"bids"`
+	Asks      []StandardOrderLevel `json:"asks"`
+	Timestamp time.Time            `json:"timestamp"`
 }
 
-type GetOrderBookResponse struct {
-	Symbol    string                     `json:"symbol"`
-	Bids      []models.OrderBookSnapshot `json:"bids"` // Buying orders (price descending)
-	Asks      []models.OrderBookSnapshot `json:"asks"` // Selling orders (price ascending)
-	Timestamp int64                      `json:"timestamp"`
+type StandardOrderBookResponse struct {
+	Symbol    string       `json:"symbol"`
+	Bids      models.JSONB `json:"bids"` // Buying orders (price descending)
+	Asks      models.JSONB `json:"asks"` // Selling orders (price ascending)
+	Timestamp string       `json:"timestamp"`
+}
+
+// StandardOrderLevel represents price level in order book
+type StandardOrderLevel struct {
+	Price    float64 `json:"price"`
+	Quantity float64 `json:"quantity"`
 }

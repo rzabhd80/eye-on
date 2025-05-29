@@ -6,7 +6,7 @@ import (
 )
 
 type BalanceSnapshot struct {
-	ID           uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	BaseModel
 	UserID       uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
 	ExchangeID   uuid.UUID `gorm:"type:uuid;not null" json:"exchange_id"`
 	Currency     string    `gorm:"size:10;not null" json:"currency"`

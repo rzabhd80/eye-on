@@ -1,0 +1,318 @@
+package helpers
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"github.com/rzabhd80/eye-on/domain/order"
+	"github.com/rzabhd80/eye-on/internal/database/models"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type Request struct {
+	client           *http.Client
+	rateLimiter      chan struct{}
+	symbolMap        map[string]string
+	reverseSymbolMap map[string]string
+}
+
+func (n *Request) MakeRequest(ctx context.Context, method, endpoint string, body []byte,
+	creds *models.ExchangeCredential, baseURL string, addBearer bool, addTokenPhrase bool) (*http.Response, []byte, error) {
+	select {
+	case n.rateLimiter <- struct{}{}:
+		defer func() { <-n.rateLimiter }()
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	}
+
+	url := baseURL + endpoint
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	if creds != nil && creds.APIKey != "" {
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+		var authToken string
+		if addBearer {
+			authToken = "Bearer " + creds.APIKey
+		} else if addTokenPhrase {
+			authToken = "Token " + creds.APIKey
+		} else {
+			authToken = creds.APIKey
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", authToken)
+		req.Header.Set("X-Timestamp", timestamp)
+
+	}
+
+	resp, err := n.client.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent &&
+		resp.StatusCode != http.StatusAccepted {
+		return nil, nil, fmt.Errorf("API error: status %d, body: %s", resp.StatusCode, string(respBody))
+	}
+
+	return resp, respBody, nil
+}
+
+// OrderCalculationHelper helps calculate amounts for different exchange formats
+type OrderCalculationHelper struct{}
+
+// ValidateOrderRequest validates that the order request has the required fields
+func (h *OrderCalculationHelper) ValidateOrderRequest(req *order.StandardOrderRequest) error {
+	if req.Symbol == "" {
+		return fmt.Errorf("symbol is required")
+	}
+
+	if req.Side != order.OrderSideBuy && req.Side != order.OrderSideSell {
+		return fmt.Errorf("invalid side: must be 'buy' or 'sell'")
+	}
+
+	if req.Type != order.OrderTypeMarket && req.Type != order.OrderTypeLimit {
+		return fmt.Errorf("invalid type: must be 'market' or 'limit'")
+	}
+
+	// For limit orders, price is required
+	if req.Type == order.OrderTypeLimit && req.Price == nil {
+		return fmt.Errorf("price is required for limit orders")
+	}
+
+	// Must have either Quantity OR (BaseAmount/QuoteAmount)
+	hasQuantity := req.Quantity != nil && *req.Quantity > 0
+	hasBaseAmount := req.BaseAmount != nil && *req.BaseAmount > 0
+	hasQuoteAmount := req.QuoteAmount != nil && *req.QuoteAmount > 0
+
+	if !hasQuantity && !hasBaseAmount && !hasQuoteAmount {
+		return fmt.Errorf("must specify either quantity or base_amount/quote_amount")
+	}
+
+	return nil
+}
+
+// GetQuantityForExchange calculates the appropriate quantity for exchanges that need single quantity
+func (h *OrderCalculationHelper) GetQuantityForExchange(req *order.StandardOrderRequest) (float64, error) {
+	// If quantity is directly specified, use it
+	if req.Quantity != nil && *req.Quantity > 0 {
+		return *req.Quantity, nil
+	}
+
+	// If base_amount is specified, use it as quantity (most common case)
+	if req.BaseAmount != nil && *req.BaseAmount > 0 {
+		return *req.BaseAmount, nil
+	}
+
+	// If only quote_amount is specified and we have price, calculate base amount
+	if req.QuoteAmount != nil && *req.QuoteAmount > 0 && req.Price != nil && *req.Price > 0 {
+		return *req.QuoteAmount / *req.Price, nil
+	}
+
+	return 0, fmt.Errorf("cannot determine quantity from provided amounts")
+}
+
+// GetBaseAmountForExchange calculates base amount for exchanges that need it separately
+func (h *OrderCalculationHelper) GetBaseAmountForExchange(req *order.StandardOrderRequest) (float64, error) {
+	// If base_amount is directly specified, use it
+	if req.BaseAmount != nil && *req.BaseAmount > 0 {
+		return *req.BaseAmount, nil
+	}
+
+	// If quantity is specified, use it as base amount
+	if req.Quantity != nil && *req.Quantity > 0 {
+		return *req.Quantity, nil
+	}
+
+	// If only quote_amount is specified and we have price, calculate base amount
+	if req.QuoteAmount != nil && *req.QuoteAmount > 0 && req.Price != nil && *req.Price > 0 {
+		return *req.QuoteAmount / *req.Price, nil
+	}
+
+	return 0, fmt.Errorf("cannot determine base amount from provided amounts")
+}
+
+// GetQuoteAmountForExchange calculates quote amount for exchanges that need it separately
+func (h *OrderCalculationHelper) GetQuoteAmountForExchange(req *order.StandardOrderRequest) (float64, error) {
+	// If quote_amount is directly specified, use it
+	if req.QuoteAmount != nil && *req.QuoteAmount > 0 {
+		return *req.QuoteAmount, nil
+	}
+
+	// Calculate from base amount and price
+	var baseAmount float64
+
+	if req.BaseAmount != nil && *req.BaseAmount > 0 {
+		baseAmount = *req.BaseAmount
+	} else if req.Quantity != nil && *req.Quantity > 0 {
+		baseAmount = *req.Quantity
+	} else {
+		return 0, fmt.Errorf("cannot determine quote amount without base amount or quantity")
+	}
+
+	if req.Price == nil || *req.Price <= 0 {
+		return 0, fmt.Errorf("cannot determine quote amount without price")
+	}
+
+	return baseAmount * *req.Price, nil
+}
+
+func (h *OrderCalculationHelper) ParseSymbolParts(symbol string) (base, quote string, err error) {
+	// Handle different symbol formats
+	if strings.Contains(symbol, "_") {
+		parts := strings.Split(symbol, "_")
+		if len(parts) != 2 {
+			return "", "", fmt.Errorf("invalid symbol format: %s", symbol)
+		}
+		return strings.ToUpper(parts[0]), strings.ToUpper(parts[1]), nil
+	}
+
+	if strings.Contains(symbol, "-") {
+		parts := strings.Split(symbol, "-")
+		if len(parts) != 2 {
+			return "", "", fmt.Errorf("invalid symbol format: %s", symbol)
+		}
+		return strings.ToUpper(parts[0]), strings.ToUpper(parts[1]), nil
+	}
+
+	// For symbols like BTCUSDT, try to parse common patterns
+	symbol = strings.ToUpper(symbol)
+
+	// Common quote currencies to try
+	quoteCurrencies := []string{"USDT", "USDC", "BTC", "ETH", "BNB", "IRT", "RLS"}
+
+	for _, quote := range quoteCurrencies {
+		if strings.HasSuffix(symbol, quote) {
+			base := strings.TrimSuffix(symbol, quote)
+			if len(base) > 0 {
+				return base, quote, nil
+			}
+		}
+	}
+
+	return "", "", fmt.Errorf("cannot parse symbol: %s", symbol)
+}
+
+func (h *OrderCalculationHelper) ConvertToNobitexFormat(req *order.StandardOrderRequest) (map[string]interface{}, error) {
+	if err := h.ValidateOrderRequest(req); err != nil {
+		return nil, err
+	}
+
+	base, quote := req.BaseCurrency, req.QuoteCurrency
+
+	quantity, err := h.GetQuantityForExchange(req)
+	if err != nil {
+		return nil, err
+	}
+
+	orderType := "buy"
+	if req.Side == order.OrderSideSell {
+		orderType = "sell"
+	}
+
+	orderData := map[string]interface{}{
+		"type":        orderType,
+		"srcCurrency": strings.ToLower(base),
+		"dstCurrency": strings.ToLower(quote),
+		"amount":      fmt.Sprintf("%.8f", quantity),
+	}
+
+	if req.Type == order.OrderTypeLimit && req.Price != nil {
+		orderData["price"] = fmt.Sprintf("%.8f", *req.Price)
+	}
+
+	if req.ClientOrderId != "" {
+		orderData["clientOrderId"] = req.ClientOrderId
+	}
+
+	return orderData, nil
+}
+
+// ConvertToBitpinFormat converts standard request to Bitpin format
+func (h *OrderCalculationHelper) ConvertToBitpinFormat(req *order.StandardOrderRequest) (map[string]interface{}, error) {
+	if err := h.ValidateOrderRequest(req); err != nil {
+		return nil, err
+	}
+
+	baseAmount, err := h.GetBaseAmountForExchange(req)
+	if err != nil {
+		return nil, err
+	}
+
+	quoteAmount, err := h.GetQuoteAmountForExchange(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert symbol to Bitpin format (e.g., BTCUSDT -> BTC_USDT)
+
+	orderData := map[string]interface{}{
+		"symbol":       req.Symbol,
+		"type":         strings.ToLower(string(req.Type)),
+		"side":         strings.ToLower(string(req.Side)),
+		"base_amount":  fmt.Sprintf("%.8f", baseAmount),
+		"quote_amount": fmt.Sprintf("%.8f", quoteAmount),
+	}
+
+	if req.Type == order.OrderTypeLimit && req.Price != nil {
+		orderData["price"] = fmt.Sprintf("%.8f", *req.Price)
+	}
+
+	if req.StopPrice != nil {
+		orderData["stop_price"] = fmt.Sprintf("%.8f", *req.StopPrice)
+	}
+
+	if req.ClientOrderId != "" {
+		orderData["identifier"] = req.ClientOrderId
+	}
+
+	return orderData, nil
+}
+
+// ConvertToBinanceFormat converts standard request to Binance format
+func (h *OrderCalculationHelper) ConvertToBinanceFormat(req *order.StandardOrderRequest) (map[string]interface{}, error) {
+	if err := h.ValidateOrderRequest(req); err != nil {
+		return nil, err
+	}
+
+	quantity, err := h.GetQuantityForExchange(req)
+	if err != nil {
+		return nil, err
+	}
+
+	orderData := map[string]interface{}{
+		"symbol":   req.Symbol,
+		"side":     strings.ToUpper(string(req.Side)),
+		"type":     strings.ToUpper(string(req.Type)),
+		"quantity": fmt.Sprintf("%.8f", quantity),
+	}
+
+	if req.Type == order.OrderTypeLimit && req.Price != nil {
+		orderData["price"] = fmt.Sprintf("%.8f", *req.Price)
+		orderData["timeInForce"] = "GTC" // Default
+	}
+
+	if req.TimeInForce != "" {
+		orderData["timeInForce"] = req.TimeInForce
+	}
+
+	if req.ClientOrderId != "" {
+		orderData["newClientOrderId"] = req.ClientOrderId
+	}
+
+	return orderData, nil
+}

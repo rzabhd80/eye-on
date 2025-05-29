@@ -12,9 +12,6 @@ CREATE TABLE order_histories
     quantity               DECIMAL(20, 8) NOT NULL,
     price                  DECIMAL(20, 8),
     status                 VARCHAR(20)    NOT NULL,
-    executed_qty           DECIMAL(20, 8) NOT NULL DEFAULT 0,
-    executed_price         DECIMAL(20, 8) NOT NULL DEFAULT 0,
-    commission             DECIMAL(20, 8) NOT NULL DEFAULT 0,
     created_at             TIMESTAMPTZ    NOT NULL DEFAULT now(),
     updated_at             TIMESTAMPTZ    NOT NULL DEFAULT now(),
     deleted_at             TIMESTAMPTZ

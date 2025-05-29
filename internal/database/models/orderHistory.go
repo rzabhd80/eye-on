@@ -15,10 +15,6 @@ type OrderHistory struct {
 	Quantity             float64   `gorm:"type:decimal(20,8);not null" json:"quantity"`
 	Price                *float64  `gorm:"type:decimal(20,8)" json:"price,omitempty"`
 	Status               string    `gorm:"size:20;not null" json:"status"`
-	ExecutedQty          float64   `gorm:"type:decimal(20,8);not null;default:0" json:"executed_qty"`
-	ExecutedPrice        float64   `gorm:"type:decimal(20,8);not null;default:0" json:"executed_price"`
-	Commission           float64   `gorm:"type:decimal(20,8);not null;default:0" json:"commission"`
-
 	// Relationships
 	User               User               `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"user,omitempty"`
 	ExchangeCredential ExchangeCredential `gorm:"foreignKey:ExchangeCredentialID;constraint:OnDelete:CASCADE" json:"exchange_credential,omitempty"`

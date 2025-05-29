@@ -9,7 +9,7 @@ import (
 )
 
 type IOrderBookSnapshotRepository interface {
-	Create(ctx context.Context, snapshot *OrderBook) error
+	Create(ctx context.Context, snapshot *models.OrderBookSnapshot) error
 	GetLatestByTradingPair(ctx context.Context, tradingPairID uuid.UUID) (*models.OrderBookSnapshot, error)
 	GetHistory(ctx context.Context, tradingPairID uuid.UUID, limit int) ([]models.OrderBookSnapshot, error)
 	DeleteOldSnapshots(ctx context.Context, olderThan time.Time) error
@@ -23,8 +23,8 @@ func NewGormOrderBookSnapshotRepository(db *gorm.DB) *OrderBookSnapshotRepositor
 	return &OrderBookSnapshotRepository{db: db}
 }
 
-func (r *OrderBookSnapshotRepository) Create(ctx context.Context, snapshot *OrderBook) error {
-	return r.db.WithContext(ctx).Create(snapshot.orderBook).Error
+func (r *OrderBookSnapshotRepository) Create(ctx context.Context, snapshot *models.OrderBookSnapshot) error {
+	return r.db.WithContext(ctx).Create(&snapshot).Error
 }
 
 func (r *OrderBookSnapshotRepository) GetLatestByTradingPair(ctx context.Context, tradingPairID uuid.UUID) (

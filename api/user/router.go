@@ -7,14 +7,14 @@ import (
 )
 
 type Router struct {
-	service *UserAuthService
-	parser  *helpers.JWTParser
+	Service *UserAuthService
+	Parser  *helpers.JWTParser
 }
 
-func (router *Router) userRouter(fiberRouter fiber.Router) {
+func (router *Router) SetUserRouter(fiberRouter fiber.Router) {
 	fiberRouter.Group("/User")
-	fiberRouter.Post("/register", router.service.Register)
-	fiberRouter.Post("/login", router.service.Login)
+	fiberRouter.Post("/register", router.Service.Register)
+	fiberRouter.Post("/login", router.Service.Login)
 	fiberRouter.Post("/exchangeCredentials", middleware.JWTAuthMiddleware(
-		*router.service.User.UserRepo, *router.parser), router.service.CreateExchangeCredential)
+		*router.Service.User.UserRepo, *router.Parser), router.Service.CreateExchangeCredential)
 }

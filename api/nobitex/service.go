@@ -1,44 +1,105 @@
 package nobitex
 
 import (
-	"context"
+	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/rzabhd80/eye-on/domain/balance"
-	"github.com/rzabhd80/eye-on/domain/exchange"
-	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
+	"github.com/rzabhd80/eye-on/domain/exchange/nobitex"
 	"github.com/rzabhd80/eye-on/domain/order"
 	"github.com/rzabhd80/eye-on/domain/orderBook"
 	"github.com/rzabhd80/eye-on/domain/user"
+	"strings"
+	"time"
 )
 
-type NobitexExchange struct {
-	ExchangeRepo           *exchange.ExchangeRepository
-	ExchangeCredentialRepo *exchangeCredentials.ExchangeCredentialRepository
-	UserREpo               *user.UserRepository
+type NobitexService struct {
+	exchange *nobitex.NobitexExchange
 }
 
-func (exchange *NobitexExchange) Name() string                   { return "" }
-func (exchange *NobitexExchange) Ping(ctx context.Context) error { return nil }
-func (exchange *NobitexExchange) GetBalance(ctx context.Context) ([]balance.Balance, error) {
-	return nil, nil
-}
-func (exchange *NobitexExchange) GetOrderBook(ctx context.Context, symbol string) (*orderBook.OrderBook, error) {
-	return nil, nil
-}
-func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.OrderRequest) (*order.Order, error) {
-	return nil, nil
+func (service *NobitexService) GetBalance(c *fiber.Ctx) error {
+	userId := c.Locals("user_id").(uuid.UUID)
+	var request balance.GetBalanceRequest
+	if err := c.ParamsParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(user.ErrorResponse{Error: "Bad Request Format"})
+	}
+	balanceSnapshots, err := service.exchange.GetBalance(c.Context(), userId, &request.Asset)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(user.ErrorResponse{Error: err.Error()})
+	}
+
+	balances := make([]balance.StandardBalanceResponse, 0, len(balanceSnapshots))
+	for _, balanceIns := range balanceSnapshots {
+		available := balanceIns.Available
+		total := balanceIns.Total
+		frozen := total - available
+
+		balances = append(balances, balance.StandardBalanceResponse{
+			Asset:  strings.ToUpper(balanceIns.Currency),
+			Free:   available,
+			Locked: frozen,
+			Total:  total,
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(balances)
 }
 
-func (exchange *NobitexExchange) GetOrder(ctx context.Context, symbol, orderID string) (*order.Order, error) {
-	return nil, nil
+func (service *NobitexService) GetOrderBook(c *fiber.Ctx) error {
+	userId := c.Locals("user_id").(uuid.UUID)
+	var request orderBook.StandardOrderBookRequest
+	if err := c.ParamsParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "Bad Request Format"})
+	}
+	orderBookHistory, err := service.exchange.GetOrderBook(c.Context(), request.Symbol, userId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
+	}
+	history := orderBook.StandardOrderBookResponse{
+		Symbol:    orderBookHistory.Symbol,
+		Bids:      orderBookHistory.Bids,
+		Asks:      orderBookHistory.Asks,
+		Timestamp: time.Now().Format(time.RFC850),
+	}
+	return c.Status(fiber.StatusOK).JSON(history)
 }
 
-func (exchange *NobitexExchange) CancelOrder(ctx context.Context, symbol, orderID string) error {
-	return nil
-}
-func (exchange *NobitexExchange) GetOpenOrders(ctx context.Context, symbol string) ([]order.Order, error) {
-	return nil, nil
+func (service *NobitexService) PlaceOrder(c *fiber.Ctx) error {
+	userId := c.Locals("user_id").(uuid.UUID)
+	var request order.StandardOrderRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "Bad Request Format"})
+	}
+	orderHistory, err := service.exchange.PlaceOrder(c.Context(), &request, userId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
+	}
+	response := order.StandardOrderResponse{
+		ID:         orderHistory.ID.String(),
+		Symbol:     orderHistory.TradingPair.Symbol,
+		Side:       order.OrderSide(orderHistory.Side),
+		Type:       order.OrderType(orderHistory.Type),
+		Quantity:   orderHistory.Quantity,
+		Price:      orderHistory.Price,
+		Status:     order.OrderStatus(orderHistory.Status),
+		CreatedAt:  orderHistory.CreatedAt,
+		UpdatedAt:  orderHistory.UpdatedAt,
+		ExchangeID: orderHistory.ExchangeID.String(),
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
 }
 
-func (exchange *NobitexExchange) GetOrderHistory(ctx context.Context, symbol string, limit int) ([]order.Order, error) {
-	return nil, nil
+func (service *NobitexService) cancelOrder(c *fiber.Ctx) error {
+	userId := c.Locals("user_id").(uuid.UUID)
+	var request order.CancelOrderRequest
+	if err := c.ParamsParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "Bad Request Format"})
+	}
+	orderId, err := uuid.Parse(request.OrderId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
+	}
+	resultErr := service.exchange.CancelOrder(c.Context(), orderId, userId)
+	if resultErr != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(map[string]string{"message": "success"})
 }

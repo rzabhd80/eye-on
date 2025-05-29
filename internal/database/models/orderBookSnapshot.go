@@ -6,7 +6,7 @@ import (
 )
 
 type OrderBookSnapshot struct {
-	ID            uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	BaseModel
 	ExchangeID    uuid.UUID `gorm:"type:uuid;not null" json:"exchange_id"`
 	TradingPairID uuid.UUID `gorm:"type:uuid;not null" json:"trading_pair_id"`
 	Symbol        string    `gorm:"size:20;not null" json:"symbol"`  // For faster queries without joins

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
+	redis2 "github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
-	"github.com/rzabhd80/eye-on/api/bitpin"
+	user2 "github.com/rzabhd80/eye-on/api/user"
 	"github.com/rzabhd80/eye-on/domain/exchange"
 	"github.com/rzabhd80/eye-on/domain/exchange/registry"
 	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
@@ -11,6 +13,7 @@ import (
 	"github.com/rzabhd80/eye-on/domain/user"
 	db "github.com/rzabhd80/eye-on/internal/database"
 	"github.com/rzabhd80/eye-on/internal/envConfig"
+	"github.com/rzabhd80/eye-on/internal/redis"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 	"log"
@@ -30,9 +33,28 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	}
 
 	psqlDb, err := db.NewDatabase(devConf)
+	redisConn := redis.RedisConnection{EnvConf: devConf}
+	redisCLient := redisConn.NewRedisClient()
+
+	defer func(redisCLient *redis2.Client) {
+		err := redisCLient.Close()
+		if err != nil {
+
+		}
+
+	}(redisCLient)
 	if err != nil {
 		return err
 	}
+	// Test connection
+	ctxRedis := context.Background()
+	pong, err := redisCLient.Ping(ctxRedis).Result()
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	fmt.Printf("Connected to Redis: %s\n", pong)
+	ctxRedis.Done()
+
 	err = psqlDb.Migrate()
 	if err != nil {
 		return err
@@ -47,13 +69,11 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 		Db: psqlDb.GormDb,
 	}
 
-	exchangeResitery := registry.NewRegistry(&exchangeRepo, &tradingPairRepo, &exchangeCredRepo)
-	registry.SetDefaultRegistry(exchangeResitery)
+	exchangeRegistery := registry.NewRegistry(&exchangeRepo, &tradingPairRepo, &exchangeCredRepo)
 
-	userRepo := user.UserRepository{
-		Db: psqlDb.GormDb,
-	}
-	registry.GetOrCreateExchange(cntx.Context, registry.ExchangeConfig{
+	registry.SetDefaultRegistry(exchangeRegistery)
+
+	bitpinExchange, err := registry.GetOrCreateExchange(ctx, registry.ExchangeConfig{
 		Name:        "bitpint",
 		DisplayName: "bitpin",
 		BaseURL:     "https://api.bitpin.ir",
@@ -62,17 +82,37 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 		Features:    nil,
 		Label:       "",
 	})
-	registry.Register("bitpin", func(cfg registry.ExchangeConfig) (registry.IExchange, error) {
-		bitpintExhcnage := bitpin.BitpinExchange{
-			ExchangeRepo:           &exchangeRepo,
-			ExchangeCredentialRepo: &exchangeCredRepo,
-			UserREpo:               &userRepo,
-		}
-		return &bitpintExhcnage, nil
+	nobitexExchange, err := registry.GetOrCreateExchange(ctx, registry.ExchangeConfig{
+		Name:        "nobitex",
+		DisplayName: "nobitex",
+		BaseURL:     "https://api.nobitex.ir/v3",
+		RateLimit:   0,
+		Timeout:     0,
+		Features:    nil,
+		Label:       "",
 	})
 
-	ctx, stp := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	if err != nil {
+		return err
+	}
+	userRepo := user.UserRepository{
+		Db: psqlDb.GormDb,
+	}
+
 	app := fiber.New()
+
+	userRouter := user2.Router{
+		Service: &user2.UserAuthService{User: &user.User{
+			UserRepo:         &userRepo,
+			ExchangeRepo:     &exchangeRepo,
+			ExchangeCredRepo: &exchangeCredRepo,
+		}},
+	}
+
+	//Register your routes here
+	userRouter.SetUserRouter(app)
+
+	ctx, stp := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
 		logger.Info("Starting server on port %s", zap.String("port", devConf.PORT))

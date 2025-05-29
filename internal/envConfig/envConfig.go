@@ -16,12 +16,20 @@ func CheckFileExists(filePath string) bool {
 
 type AppConfig struct {
 	DatabaseConfig
+	RedisConfig
 	AppName       string `env:"APP_NAME" envDefault:"eye on"`
 	AppVersion    string `env:"APP_VERSION" envDefault:"0.0.1"`
 	HOST          string `env:"HOST" envDefault:"0.0.0.0"`
 	PORT          string `env:"PORT" envDefault:"8080"`
 	EncryptionKey string `env:"ENCRYPTION_KEY"`
 	JWTKey        string `env:"JWT_KEY"`
+}
+
+type RedisConfig struct {
+	RedisHost     string ` env:"REDIS_HOST" json:"redis-host"`
+	RedisPort     int    `env:"REDIS_PORT" json:"redis-port"`
+	RedisPassword string `env:"REDIS_PASSWORD" json:"redis_password"`
+	RedisDB       int    `env:"REDIS_DB" json:"redis-db"`
 }
 
 type DatabaseConfig struct {

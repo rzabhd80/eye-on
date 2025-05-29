@@ -47,7 +47,7 @@ func (r *ExchangeRegistry) Register(name string, constructor Constructor) {
 // ExchangeResult contains both the database model and runtime instance
 type ExchangeResult struct {
 	Exchange      *models.Exchange
-	symbols       []traidingPair.TradingPair
+	symbols       []models.TradingPair
 	Instance      IExchange
 	IsNewExchange bool
 }
@@ -111,19 +111,17 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 		return nil, err
 	}
 	if len(tradingPairs) != len(cfg.symbols) {
-		var newPairs []traidingPair.TradingPair
+		var newPairs []models.TradingPair
 
 		for _, symbolPair := range cfg.symbols {
-			tradingPair := traidingPair.TradingPair{
-				TradingPair: models.TradingPair{
-					BaseModel: models.BaseModel{
-						ID: uuid.New(),
-					},
-					ExchangeID: exchangeInstance.ID,
-					Symbol:     symbolPair.Symbol,
-					BaseAsset:  symbolPair.BaseAsset,
-					QuoteAsset: symbolPair.QuoteAsset,
+			tradingPair := models.TradingPair{
+				BaseModel: models.BaseModel{
+					ID: uuid.New(),
 				},
+				ExchangeID: exchangeInstance.ID,
+				Symbol:     symbolPair.Symbol,
+				BaseAsset:  symbolPair.BaseAsset,
+				QuoteAsset: symbolPair.QuoteAsset,
 			}
 			errPair := r.tradingPairRepo.Create(ctx, &tradingPair)
 			if errPair != nil {

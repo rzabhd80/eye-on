@@ -11,7 +11,6 @@ import (
 )
 
 type User struct {
-	User             models.User
 	UserRepo         *UserRepository
 	ExchangeRepo     *exchange.ExchangeRepository
 	ExchangeCredRepo *exchangeCredentials.ExchangeCredentialRepository
@@ -103,14 +102,13 @@ func (user *User) CreateExchangeCredential(ctx context.Context, request Exchange
 		return nil, &ErrorResponse{Error: "Internal Server Error"}
 	}
 	return &ExchangeCredentialResponse{
-		ID:          credential.ID,
-		ExchangeID:  exchangeReg.ID,
-		Label:       request.Label,
-		APIKey:      request.APIKey,
-		IsActive:    true,
-		IsTestnet:   false,
-		Permissions: nil,
-		LastUsed:    nil,
-		Exchange:    *exchangeReg,
+		ID:         credential.ID,
+		ExchangeID: exchangeReg.ID,
+		Label:      request.Label,
+		APIKey:     request.APIKey,
+		IsActive:   true,
+		IsTestnet:  false,
+		LastUsed:   nil,
+		Exchange:   *exchangeReg,
 	}, nil
 }
