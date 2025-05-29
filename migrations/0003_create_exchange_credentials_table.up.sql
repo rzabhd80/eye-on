@@ -13,7 +13,7 @@ CREATE TABLE exchange_credentials
     last_used   TIMESTAMPTZ,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    deleted_at  TIMESTAMPTZ,
+    deleted_at  TIMESTAMPTZ
 );
 
 CREATE INDEX idx_exchange_credentials_user_exchange ON

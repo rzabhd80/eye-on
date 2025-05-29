@@ -2,6 +2,7 @@ CREATE TABLE trading_pairs
 (
     id           UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
     exchange_id  UUID        NOT NULL REFERENCES exchanges (id) ON DELETE CASCADE,
+    UNIQUE (exchange_id, id),
     symbol       VARCHAR(20) NOT NULL,
     base_asset   VARCHAR(10) NOT NULL,
     quote_asset  VARCHAR(10) NOT NULL,

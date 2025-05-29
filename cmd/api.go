@@ -64,7 +64,6 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	}
 	fmt.Printf("Connected to Redis: %s\n", pong)
 	ctxRedis.Done()
-
 	err = psqlDb.Migrate()
 	if err != nil {
 		return err
@@ -81,10 +80,9 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	exchangeRegistery := registry.NewRegistry(exchangeRepo, &tradingPairRepo, exchangeCredRepo)
 
 	registry.SetDefaultRegistry(exchangeRegistery)
-	
+
 	bitpinSymbolRegistry := bitpinEntity.BitpinSymbolRegistry{}
 	NobitexSymbolRegistry := nobitexEntity.NobitexSymbolRegistry{}
-
 	bitpinExchange, err := registry.GetOrCreateExchange(ctx, registry.ExchangeConfig{
 		Name:          "bitpint",
 		DisplayName:   "bitpin",

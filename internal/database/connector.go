@@ -18,8 +18,10 @@ type Database struct {
 }
 
 func NewDatabase(config *envCofig.AppConfig) (*Database, error) {
+	_ = fmt.Sprintf("%s", config.DbHost)
+	_ = fmt.Sprintf("%s", config.DbPort)
 	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		config.DbUser, config.DbPassword, config.DbHost, config.DbPort, config.DbName,
 	)
 	db, err := sql.Open("postgres", dsn)
@@ -46,6 +48,7 @@ func (database *Database) Migrate() error {
 	if err != nil {
 		return fmt.Errorf("migrate init: %w", err)
 	}
+
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("migrate up: %w", err)
 	}

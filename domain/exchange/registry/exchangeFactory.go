@@ -12,10 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
-type Constructor func(cfg ExchangeConfig) (IExchange, error)
-
 var (
-	constructors = make(map[string]Constructor)
+	exchanges = make(map[string]ExchangeConfig)
 )
 
 // ExchangeRegistry manages exchange registration and creation
@@ -23,7 +21,7 @@ type ExchangeRegistry struct {
 	exchangeRepo            *exchange.ExchangeRepository
 	tradingPairRepo         *traidingPair.TradingPairRepository
 	exchangeCredentialsRepo *exchangeCredentials.ExchangeCredentialRepository
-	constructors            map[string]Constructor
+	constructors            map[string]IExchange
 }
 
 func NewRegistry(repo *exchange.ExchangeRepository, tradingRepo *traidingPair.TradingPairRepository,
@@ -32,35 +30,24 @@ func NewRegistry(repo *exchange.ExchangeRepository, tradingRepo *traidingPair.Tr
 		exchangeRepo:            repo,
 		tradingPairRepo:         tradingRepo,
 		exchangeCredentialsRepo: exchangeCredentialsRepo,
-		constructors:            make(map[string]Constructor),
+		constructors:            make(map[string]IExchange),
 	}
-}
-
-// Register is called by each adapter in its init()
-func (r *ExchangeRegistry) Register(name string, constructor Constructor) {
-	if _, dup := r.constructors[name]; dup {
-		panic("exchange " + name + " already registered")
-	}
-	r.constructors[name] = constructor
 }
 
 // ExchangeResult contains both the database model and runtime instance
 type ExchangeResult struct {
 	Exchange      *models.Exchange
 	symbols       []models.TradingPair
-	Instance      IExchange
 	IsNewExchange bool
 }
 
 // GetOrCreateExchangeConfig creates or retrieves an exchange
 func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg ExchangeConfig) (
 	*ExchangeResult, error) {
-
-	constructor, ok := r.constructors[cfg.Name]
-	if !ok {
-		return nil, fmt.Errorf("exchangeInstance %s not supported", cfg.Name)
+	exchangeConf, found := exchanges[cfg.Name]
+	if !found {
+		exchanges[cfg.Name] = exchangeConf
 	}
-
 	// Start a transaction
 	tx := r.exchangeRepo.Db.WithContext(ctx).Begin()
 	defer func() {
@@ -71,14 +58,16 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 	}()
 
 	// Check if exchangeInstance exists
-	var exchangeInstance models.Exchange
-	err := tx.Where("name = ? AND is_active = ?", cfg.Name, true).First(&exchangeInstance).Error
+	var exchangeInstance *models.Exchange
+	var err error
+	exchangeInstance, err = r.exchangeRepo.GetByName(ctx, cfg.Name)
 	isNewExchange := false
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+
 			// Create new exchangeInstance
-			exchangeInstance = models.Exchange{
+			exchangeInstance = &models.Exchange{
 				BaseModel: models.BaseModel{
 					ID: uuid.New(),
 				},
@@ -87,12 +76,12 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 				BaseURL:     cfg.BaseURL,
 				IsActive:    true,
 				RateLimit:   cfg.RateLimit,
-				Features:    models.JSONB(cfg.Features),
+				Features:    cfg.Features,
 			}
 
-			if err := tx.Create(&exchangeInstance).Error; err != nil {
-				tx.Rollback()
-				return nil, fmt.Errorf("failed to create exchangeInstance: %w", err)
+			err = r.exchangeRepo.Create(ctx, exchangeInstance)
+			if err != nil {
+				return nil, err
 			}
 			isNewExchange = true
 		} else {
@@ -101,7 +90,7 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 		}
 	}
 
-	symbols := cfg.SymbolFactory.RegisterExchangeSymbols(&exchangeInstance)
+	symbols := cfg.SymbolFactory.RegisterExchangeSymbols(exchangeInstance)
 	//setting up the symbols
 	var exchangeSymbols []string
 	for _, symbol := range *symbols {
@@ -144,15 +133,8 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Create the exchangeInstance instance
-	instance, err := constructor(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create exchangeInstance instance: %w", err)
-	}
-
 	return &ExchangeResult{
-		Exchange:      &exchangeInstance,
-		Instance:      instance,
+		Exchange:      exchangeInstance,
 		IsNewExchange: isNewExchange,
 		symbols:       *tradingPairs,
 	}, nil
@@ -174,12 +156,6 @@ func SetDefaultRegistry(registry *ExchangeRegistry) {
 }
 
 // Register registers an exchange constructor in the default registry
-func Register(name string, constructor Constructor) {
-	if defaultRegistry == nil {
-		panic("default registry not initialized. Call SetDefaultRegistry first")
-	}
-	defaultRegistry.Register(name, constructor)
-}
 
 // GetOrCreateExchange uses the default registry
 func GetOrCreateExchange(ctx context.Context, cfg ExchangeConfig) (*ExchangeResult, error) {
