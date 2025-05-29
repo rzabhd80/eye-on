@@ -7,7 +7,6 @@ import (
 	"github.com/rzabhd80/eye-on/domain/exchange/nobitex"
 	"github.com/rzabhd80/eye-on/domain/order"
 	"github.com/rzabhd80/eye-on/domain/orderBook"
-	"github.com/rzabhd80/eye-on/domain/user"
 	"strings"
 	"time"
 )
@@ -20,11 +19,11 @@ func (service *NobitexService) GetBalance(c *fiber.Ctx) error {
 	userId := c.Locals("user_id").(uuid.UUID)
 	var request balance.GetBalanceRequest
 	if err := c.ParamsParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(user.ErrorResponse{Error: "Bad Request Format"})
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "Bad Request Format"})
 	}
 	balanceSnapshots, err := service.exchange.GetBalance(c.Context(), userId, &request.Asset)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(user.ErrorResponse{Error: err.Error()})
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
 	}
 
 	balances := make([]balance.StandardBalanceResponse, 0, len(balanceSnapshots))
