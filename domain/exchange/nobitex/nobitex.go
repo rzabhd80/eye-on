@@ -191,11 +191,11 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 	request := exchange.Request
-	respBody, body, err := request.MakeRequest(ctx, "POST", "api/v1/odr/orders", body, &models.ExchangeCredential{
+	respBody, body, err := request.MakeRequest(ctx, "POST", "/market/orders/add", body, &models.ExchangeCredential{
 		APIKey:    creds.APIKey,
 		SecretKey: creds.SecretKey,
 		IsTestnet: creds.IsTestnet,
-	}, exchange.NobitexExchangeModel.BaseURL, true, false, helpers.ApiKeyAuth)
+	}, exchange.NobitexExchangeModel.BaseURL, false, true, helpers.ApiKeyAuth)
 	if err != nil {
 		return nil, err
 	}
