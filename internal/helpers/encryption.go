@@ -5,12 +5,16 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"golang.org/x/crypto/bcrypt"
 	"io"
 )
 
-// Encrypt AES-GCM
-func Encrypt(plaintext string, key []byte) (string, error) {
+func EncryptAPIKey(plaintext, secretKey string) (string, error) {
+	key, err := base64.StdEncoding.DecodeString(secretKey)
+	if err != nil {
+		return "", err
+	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
@@ -22,8 +26,7 @@ func Encrypt(plaintext string, key []byte) (string, error) {
 	}
 
 	nonce := make([]byte, aesGCM.NonceSize())
-	_, err = io.ReadFull(rand.Reader, nonce)
-	if err != nil {
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", err
 	}
 
@@ -31,9 +34,9 @@ func Encrypt(plaintext string, key []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
-// Decrypt AES-GCM
-func Decrypt(ciphertext string, key []byte) (string, error) {
-	data, err := base64.StdEncoding.DecodeString(ciphertext)
+func DecryptAPIKey(encryptedText, secretKey string) (string, error) {
+	key, err := base64.StdEncoding.DecodeString(secretKey)
+	data, err := base64.StdEncoding.DecodeString(encryptedText)
 	if err != nil {
 		return "", err
 	}
@@ -49,9 +52,12 @@ func Decrypt(ciphertext string, key []byte) (string, error) {
 	}
 
 	nonceSize := aesGCM.NonceSize()
-	nonce, ciphertextBytes := data[:nonceSize], data[nonceSize:]
+	if len(data) < nonceSize {
+		return "", errors.New("invalid ciphertext")
+	}
 
-	plaintext, err := aesGCM.Open(nil, nonce, ciphertextBytes, nil)
+	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", err
 	}

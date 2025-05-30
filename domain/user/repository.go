@@ -61,7 +61,7 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 }
 
 func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&User{}, id).Error
+	return r.db.WithContext(ctx).Delete(&models.User{}, id).Error
 }
 
 func (r *UserRepository) List(ctx context.Context, limit, offset int) (*[]models.User, error) {

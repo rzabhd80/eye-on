@@ -60,7 +60,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 	if err != nil {
 		return nil, err
 	}
-	respBody, body, err := request.MakeRequest(ctx, "POST", "/users/wallets/balance", marshaledBody, &models.ExchangeCredential{
+	respBody, body, err := request.MakeRequest(ctx, "POST", "/users/wallets/balance/", marshaledBody, &models.ExchangeCredential{
 		APIKey:    creds.APIKey,
 		SecretKey: creds.SecretKey,
 		IsTestnet: creds.IsTestnet,
@@ -282,7 +282,7 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 	return &orderHistory, nil
 }
 
-func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID uuid.UUID, userId uuid.UUID) error {
+func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID string, userId uuid.UUID) error {
 	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.NobitexExchangeModel.ID)
 	if creds == nil {
 		return fmt.Errorf("credentials are required")
@@ -292,7 +292,7 @@ func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID uuid.U
 	}
 	request := exchange.Request
 	requestBody := map[string]string{
-		"Order":  orderID.String(),
+		"Order":  orderID,
 		"Status": "Canceled",
 	}
 	requestBodyJson, err := json.Marshal(requestBody)

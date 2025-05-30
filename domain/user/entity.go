@@ -7,6 +7,7 @@ import (
 	"github.com/rzabhd80/eye-on/domain/exchange"
 	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
 	"github.com/rzabhd80/eye-on/internal/database/models"
+	envCofig "github.com/rzabhd80/eye-on/internal/envConfig"
 	"github.com/rzabhd80/eye-on/internal/helpers"
 )
 
@@ -15,6 +16,7 @@ type User struct {
 	ExchangeRepo     *exchange.ExchangeRepository
 	ExchangeCredRepo *exchangeCredentials.ExchangeCredentialRepository
 	JwtParser        *helpers.JWTParser
+	EnvConf          *envCofig.AppConfig
 }
 
 func (user *User) Register(ctx context.Context, request RegisterRequest) (*AuthResponse, *ErrorResponse) {
@@ -82,26 +84,34 @@ func (user *User) CreateExchangeCredential(ctx context.Context, request Exchange
 	if err == nil && existingCredentials != nil {
 		return nil, &ErrorResponse{Error: "Exchange Credentials Already Exists "}
 	}
+	ecryptionKey := user.EnvConf.EncryptionKey
+	encryptedApiKey, err := helpers.EncryptAPIKey(request.APIKey, ecryptionKey)
+	if err != nil {
+		return nil, &ErrorResponse{Error: "Internal Server Error "}
+	}
 	encryptedSecretKey := hex.EncodeToString([]byte(request.SecretKey))
-	encryptedPassphrase := ""
+	encryptedAccKey := ""
 	if request.AccessKey != "" {
-		encryptedPassphrase = hex.EncodeToString([]byte(request.AccessKey))
+		encryptedAccKey, err = helpers.EncryptAPIKey(request.AccessKey, ecryptionKey)
+		if err != nil {
+			return nil, &ErrorResponse{Error: "Internal Server Error "}
+		}
 	}
 	credential := models.ExchangeCredential{
 		UserID:     userId,
 		ExchangeID: exchangeReg.ID,
 		Label:      request.Label,
-		APIKey:     request.APIKey,
+		APIKey:     encryptedApiKey,
 		SecretKey:  encryptedSecretKey,
-		AccessKey:  encryptedPassphrase,
+		AccessKey:  encryptedAccKey,
 		IsActive:   true,
 		IsTestnet:  request.IsTestnet,
 	}
-	err = user.ExchangeCredRepo.Create(ctx, &credential)
+	err = user.ExchangeCredRepo.Update(ctx, &credential)
 	if err != nil {
 		return nil, &ErrorResponse{Error: "Internal Server Error"}
 	}
-	return &ExchangeCredentialResponse{
+	response := &ExchangeCredentialResponse{
 		ID:         credential.ID,
 		ExchangeID: exchangeReg.ID,
 		Label:      request.Label,
@@ -110,7 +120,11 @@ func (user *User) CreateExchangeCredential(ctx context.Context, request Exchange
 		IsTestnet:  false,
 		LastUsed:   nil,
 		Exchange:   *exchangeReg,
-	}, nil
+	}
+	if request.AccessKey != "" {
+		response.AccessKey = &request.AccessKey
+	}
+	return response, nil
 }
 
 func (user *User) UpdateExchangeCredential(ctx context.Context, request ExchangeCredentialUpdateRequest, userId uuid.UUID) (
@@ -124,18 +138,26 @@ func (user *User) UpdateExchangeCredential(ctx context.Context, request Exchange
 	if err != nil || existingCredentials == nil {
 		return nil, &ErrorResponse{Error: "Exchange Credentials Not Found "}
 	}
+	ecryptionKey := user.EnvConf.EncryptionKey
+	encryptedApiKey, err := helpers.EncryptAPIKey(request.APIKey, ecryptionKey)
+	if err != nil {
+		return nil, &ErrorResponse{Error: "Internal Server Error "}
+	}
 	encryptedSecretKey := hex.EncodeToString([]byte(request.SecretKey))
-	encryptedPassphrase := ""
+	encryptedAccKey := ""
 	if request.AccessKey != "" {
-		encryptedPassphrase = hex.EncodeToString([]byte(request.AccessKey))
+		encryptedAccKey, err = helpers.EncryptAPIKey(request.AccessKey, ecryptionKey)
+		if err != nil {
+			return nil, &ErrorResponse{Error: "Internal Server Error "}
+		}
 	}
 	credential := models.ExchangeCredential{
 		UserID:     userId,
 		ExchangeID: exchangeReg.ID,
 		Label:      request.Label,
-		APIKey:     request.APIKey,
+		APIKey:     encryptedApiKey,
 		SecretKey:  encryptedSecretKey,
-		AccessKey:  encryptedPassphrase,
+		AccessKey:  encryptedAccKey,
 		IsActive:   true,
 		IsTestnet:  request.IsTestnet,
 	}
@@ -143,7 +165,7 @@ func (user *User) UpdateExchangeCredential(ctx context.Context, request Exchange
 	if err != nil {
 		return nil, &ErrorResponse{Error: "Internal Server Error"}
 	}
-	return &ExchangeCredentialResponse{
+	response := &ExchangeCredentialResponse{
 		ID:         credential.ID,
 		ExchangeID: exchangeReg.ID,
 		Label:      request.Label,
@@ -152,5 +174,9 @@ func (user *User) UpdateExchangeCredential(ctx context.Context, request Exchange
 		IsTestnet:  false,
 		LastUsed:   nil,
 		Exchange:   *exchangeReg,
-	}, nil
+	}
+	if request.AccessKey != "" {
+		response.AccessKey = &request.AccessKey
+	}
+	return response, nil
 }

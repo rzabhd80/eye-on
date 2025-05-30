@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/rzabhd80/eye-on/internal/database/models"
+	envCofig "github.com/rzabhd80/eye-on/internal/envConfig"
+	"github.com/rzabhd80/eye-on/internal/helpers"
 	"gorm.io/gorm"
 	"time"
 )
@@ -18,11 +20,12 @@ type IExchangeCredentialRepository interface {
 }
 
 type ExchangeCredentialRepository struct {
-	Db *gorm.DB
+	Db      *gorm.DB
+	EnvConf *envCofig.AppConfig
 }
 
-func NewExchangeCredentialRepository(db *gorm.DB) *ExchangeCredentialRepository {
-	return &ExchangeCredentialRepository{Db: db}
+func NewExchangeCredentialRepository(db *gorm.DB, envConf *envCofig.AppConfig) *ExchangeCredentialRepository {
+	return &ExchangeCredentialRepository{Db: db, EnvConf: envConf}
 }
 
 func (r *ExchangeCredentialRepository) Create(ctx context.Context, cred *models.ExchangeCredential) error {
@@ -35,6 +38,21 @@ func (r *ExchangeCredentialRepository) GetByID(ctx context.Context, id uuid.UUID
 	if err != nil {
 		return nil, err
 	}
+	key := r.EnvConf.EncryptionKey
+	apiKeyDecr, err := helpers.DecryptAPIKey(cred.APIKey, key)
+	if err != nil {
+		return nil, err
+	}
+
+	var accKeyDec string
+	if cred.AccessKey != "" {
+		accKeyDec, err = helpers.DecryptAPIKey(cred.AccessKey, key)
+		if err != nil {
+			return nil, err
+		}
+	}
+	cred.AccessKey = accKeyDec
+	cred.APIKey = apiKeyDecr
 	return &cred, nil
 }
 
@@ -46,7 +64,23 @@ func (r *ExchangeCredentialRepository) GetByUserAndExchange(ctx context.Context,
 		Where("user_id = ? AND exchange_id = ? AND is_active = ?", userID, exchangeID, true).
 		Order("created_at DESC").
 		First(&creds).Error
+	key := r.EnvConf.EncryptionKey
+	apiKeyDecr, err := helpers.DecryptAPIKey(creds.APIKey, key)
+	if err != nil {
+		return nil, err
+	}
+
+	var accKeyDec string
+	if creds.AccessKey != "" {
+		accKeyDec, err = helpers.DecryptAPIKey(creds.AccessKey, key)
+		if err != nil {
+			return nil, err
+		}
+	}
+	creds.AccessKey = accKeyDec
+	creds.APIKey = apiKeyDecr
 	return creds, err
+
 }
 
 func (r *ExchangeCredentialRepository) Update(ctx context.Context, cred *models.ExchangeCredential) error {

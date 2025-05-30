@@ -72,7 +72,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 
 	tradingPairRepo := traidingPair.TradingPairRepository{DB: psqlDb.GormDb}
 
-	exchangeCredRepo := exchangeCredentials.NewExchangeCredentialRepository(psqlDb.GormDb)
+	exchangeCredRepo := exchangeCredentials.NewExchangeCredentialRepository(psqlDb.GormDb, devConf)
 	orderRepo := order.NewOrderHistoryRepository(psqlDb.GormDb)
 	orderBookRepo := orderBook.NewOrderBookSnapshotRepository(psqlDb.GormDb)
 	balanceRepo := balance.NewBalanceSnapshotRepository(psqlDb.GormDb)
@@ -114,6 +114,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 			ExchangeRepo:     exchangeRepo,
 			ExchangeCredRepo: exchangeCredRepo,
 			JwtParser:        &jwtParser,
+			EnvConf:          devConf,
 		}},
 		Parser: &jwtParser,
 	}

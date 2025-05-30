@@ -87,11 +87,6 @@ func (n *Request) MakeRequest(ctx context.Context, method, endpoint string, body
 		return nil, nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent &&
-		resp.StatusCode != http.StatusAccepted {
-		return nil, nil, fmt.Errorf("API error: status %d, body: %s", resp.StatusCode, string(respBody))
-	}
-
 	return resp, respBody, nil
 }
 
