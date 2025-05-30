@@ -13,6 +13,13 @@ import (
 	"time"
 )
 
+type AuthToken string
+
+const (
+	ApiKeyAuth  AuthToken = "ApiKey"
+	ApiAccToken AuthToken = "ApiAccToken"
+)
+
 type Request struct {
 	client           *http.Client
 	rateLimiter      chan struct{}
@@ -29,7 +36,7 @@ func NewRequest(timeout time.Duration) *Request {
 }
 
 func (n *Request) MakeRequest(ctx context.Context, method, endpoint string, body []byte,
-	creds *models.ExchangeCredential, baseURL string, addBearer bool, addTokenPhrase bool) (*http.Response, []byte, error) {
+	creds *models.ExchangeCredential, baseURL string, addBearer bool, addTokenPhrase bool, apiKey AuthToken) (*http.Response, []byte, error) {
 	url := baseURL + endpoint
 	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
 	if err != nil {
@@ -38,7 +45,22 @@ func (n *Request) MakeRequest(ctx context.Context, method, endpoint string, body
 
 	req.Header.Set("Content-Type", "application/json")
 
-	if creds != nil && creds.APIKey != "" {
+	if creds != nil && creds.AccessKey != "" && apiKey == ApiAccToken {
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+		var authToken string
+		if addBearer {
+			authToken = "Bearer " + creds.AccessKey
+		} else if addTokenPhrase {
+			authToken = "Token " + creds.AccessKey
+		} else {
+			authToken = creds.APIKey
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", authToken)
+		req.Header.Set("X-Timestamp", timestamp)
+	}
+
+	if creds != nil && creds.APIKey != "" && apiKey == ApiKeyAuth {
 		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 		var authToken string
 		if addBearer {

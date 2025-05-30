@@ -64,7 +64,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 		APIKey:    creds.APIKey,
 		SecretKey: creds.SecretKey,
 		IsTestnet: creds.IsTestnet,
-	}, exchange.NobitexExchangeModel.BaseURL, false, true)
+	}, exchange.NobitexExchangeModel.BaseURL, false, true, helpers.ApiKeyAuth)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (exchange *NobitexExchange) GetOrderBook(ctx context.Context, symbol string
 	endpoint := fmt.Sprintf("/v3/orderbook/%s", symbol)
 
 	respBody, body, err := request.MakeRequest(ctx, "GET", endpoint, nil, nil,
-		exchange.NobitexExchangeModel.BaseURL, false, false)
+		exchange.NobitexExchangeModel.BaseURL, false, false, helpers.ApiKeyAuth)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 		APIKey:    creds.APIKey,
 		SecretKey: creds.SecretKey,
 		IsTestnet: creds.IsTestnet,
-	}, exchange.NobitexExchangeModel.BaseURL, true, false)
+	}, exchange.NobitexExchangeModel.BaseURL, true, false, helpers.ApiKeyAuth)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +301,7 @@ func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID uuid.U
 			APIKey:    creds.APIKey,
 			SecretKey: creds.SecretKey,
 			IsTestnet: creds.IsTestnet,
-		}, exchange.NobitexExchangeModel.BaseURL, true, false)
+		}, exchange.NobitexExchangeModel.BaseURL, true, false, helpers.ApiKeyAuth)
 	if err != nil {
 		return err
 	}

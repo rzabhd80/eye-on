@@ -45,11 +45,11 @@ func (exchange *BitpinExchange) GetBalance(ctx context.Context, userId uuid.UUID
 	}
 	request := exchange.Request
 
-	respBody, body, err := request.MakeRequest(ctx, "GET", "api/v1/wlt/wallets/", nil, &models.ExchangeCredential{
+	respBody, body, err := request.MakeRequest(ctx, "GET", "/api/v1/wlt/wallets/", nil, &models.ExchangeCredential{
 		APIKey:    creds.APIKey,
 		SecretKey: creds.SecretKey,
 		IsTestnet: creds.IsTestnet,
-	}, exchange.BitpinExchangeModel.BaseURL, true, false)
+	}, exchange.BitpinExchangeModel.BaseURL, true, false, helpers.ApiAccToken)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (exchange *BitpinExchange) GetOrderBook(ctx context.Context, symbol string,
 	endpoint := fmt.Sprintf("/api/v1/mth/orderbook/%s/", symbol)
 
 	respBody, body, err := request.MakeRequest(ctx, "GET", endpoint, nil, nil,
-		exchange.BitpinExchangeModel.BaseURL, false, false)
+		exchange.BitpinExchangeModel.BaseURL, false, false, helpers.ApiAccToken)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (exchange *BitpinExchange) GetOrderBook(ctx context.Context, symbol string,
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return &orderbookInstance, nil
 }
 func (exchange *BitpinExchange) PlaceOrder(ctx context.Context, req *order.StandardOrderRequest, userId uuid.UUID) (*models.OrderHistory, error) {
 	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.BitpinExchangeModel.ID)
@@ -200,7 +200,7 @@ func (exchange *BitpinExchange) PlaceOrder(ctx context.Context, req *order.Stand
 		APIKey:    creds.APIKey,
 		SecretKey: creds.SecretKey,
 		IsTestnet: creds.IsTestnet,
-	}, exchange.BitpinExchangeModel.BaseURL, true, false)
+	}, exchange.BitpinExchangeModel.BaseURL, true, false, helpers.ApiAccToken)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +293,7 @@ func (exchange *BitpinExchange) CancelOrder(ctx context.Context, orderID uuid.UU
 		APIKey:    creds.APIKey,
 		SecretKey: creds.SecretKey,
 		IsTestnet: creds.IsTestnet,
-	}, exchange.BitpinExchangeModel.BaseURL, true, false)
+	}, exchange.BitpinExchangeModel.BaseURL, true, false, helpers.ApiAccToken)
 	if err != nil {
 		return err
 	}

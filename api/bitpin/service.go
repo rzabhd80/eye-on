@@ -18,7 +18,7 @@ type BitpinService struct {
 func (service *BitpinService) GetBalance(c *fiber.Ctx) error {
 	userId := c.Locals("user_id").(uuid.UUID)
 	var request balance.GetBalanceRequest
-	if err := c.ParamsParser(&request); err != nil {
+	if err := c.QueryParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(bitpin.ErrorResponse{Error: "Bad Request Format"})
 	}
 	balanceSnapshots, err := service.Exchange.GetBalance(c.Context(), userId, &request.Asset)
