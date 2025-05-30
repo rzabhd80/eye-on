@@ -95,7 +95,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	nobitexExchange, err := registry.GetOrCreateExchange(ctx, registry.ExchangeConfig{
 		Name:          "nobitex",
 		DisplayName:   "nobitex",
-		BaseURL:       "https://api.nobitex.ir/v3",
+		BaseURL:       "https://api.nobitex.ir",
 		RateLimit:     0,
 		Features:      nil,
 		SymbolFactory: &NobitexSymbolRegistry,

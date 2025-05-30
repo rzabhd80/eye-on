@@ -46,13 +46,6 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 		return nil, errors.New("Internal Server Error")
 	}
 	request := exchange.Request
-	signExists, err := exchange.TradingPairRepo.GetByExchangeAndSymbol(ctx, exchange.NobitexExchangeModel.ID, *symbol)
-	if signExists == nil {
-		return nil, errors.New("Exchange does not support this symbol")
-	}
-	if err != nil {
-		return nil, err
-	}
 	symbolBody := map[string]string{
 		"currency": *symbol,
 	}
@@ -60,7 +53,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 	if err != nil {
 		return nil, err
 	}
-	respBody, body, err := request.MakeRequest(ctx, "POST", "/users/wallets/balance/", marshaledBody, &models.ExchangeCredential{
+	respBody, body, err := request.MakeRequest(ctx, "POST", "/users/wallets/balance", marshaledBody, &models.ExchangeCredential{
 		APIKey:    creds.APIKey,
 		SecretKey: creds.SecretKey,
 		IsTestnet: creds.IsTestnet,
@@ -69,7 +62,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 		return nil, err
 	}
 	if respBody.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("balance request failed: %s", respBody.Body)
+		return nil, fmt.Errorf("balance request failed: %s", body)
 	}
 	balanceResp := struct {
 		Balance string `json:"balance"`

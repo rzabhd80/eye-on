@@ -229,6 +229,7 @@ func (exchange *BitpinExchange) PlaceOrder(ctx context.Context, req *order.Stand
 	if respBody.StatusCode != http.StatusOK && respBody.StatusCode != http.StatusAccepted &&
 		respBody.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("API error. Exchange said: status %d, body: %s", respBody.StatusCode, string(body))
+
 	}
 	if err := json.Unmarshal(body, &exchangeOrderResponse); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)

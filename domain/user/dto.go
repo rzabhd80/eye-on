@@ -27,7 +27,7 @@ type ExchangeCredentialRequest struct {
 	Label        string `json:"label" validate:"required"`
 	APIKey       string `json:"api_key" validate:"required"`
 	SecretKey    string `json:"secret_key" validate:"required"`
-	AccessKey    string `json:"passphrase,omitempty"`
+	AccessKey    string `json:"access_key,omitempty"`
 	IsTestnet    bool   `json:"is_testnet"`
 }
 

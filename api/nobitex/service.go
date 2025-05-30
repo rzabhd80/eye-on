@@ -17,11 +17,12 @@ type NobitexService struct {
 
 func (service *NobitexService) GetBalance(c *fiber.Ctx) error {
 	userId := c.Locals("user_id").(uuid.UUID)
-	var request balance.GetBalanceRequest
-	if err := c.QueryParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "Bad Request Format"})
+	symbol := c.Params("symbol")
+	if symbol == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "provide a symbol as param"})
 	}
-	balanceSnapshots, err := service.Exchange.GetBalance(c.Context(), userId, &request.Asset)
+
+	balanceSnapshots, err := service.Exchange.GetBalance(c.Context(), userId, &symbol)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: err.Error()})
 	}
