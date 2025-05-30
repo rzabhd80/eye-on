@@ -30,7 +30,7 @@ type BitpinExchange struct {
 	OrderRepo              *order.OrderRepository
 	OrderBookRepo          *orderBook.OrderBookSnapshotRepository
 	BalanceRepo            *balance.BalanceSnapshotRepository
-	Request                helpers.Request
+	Request                *helpers.Request
 }
 
 func (exchange *BitpinExchange) Name() string                   { return exchange.BitpinExchangeModel.Name }
@@ -287,7 +287,7 @@ func (exchange *BitpinExchange) CancelOrder(ctx context.Context, orderID uuid.UU
 	if err != nil {
 		return errors.New("Internal Server Error")
 	}
-	request := helpers.Request{}
+	request := exchange.Request
 	endpoint := fmt.Sprintf("/api/v1/odr/orders/%s", orderID)
 	respBody, _, err := request.MakeRequest(ctx, "DELETE", endpoint, nil, &models.ExchangeCredential{
 		APIKey:    creds.APIKey,

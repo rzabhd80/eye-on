@@ -1,11 +1,15 @@
 CREATE TABLE order_book_snapshots
 (
-    id              BIGSERIAL PRIMARY KEY,
+    id             UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
     exchange_id     UUID        NOT NULL REFERENCES exchanges (id) ON DELETE CASCADE,
     trading_pair_id UUID        NOT NULL REFERENCES trading_pairs (id) ON DELETE CASCADE,
+    symbol          VARCHAR(20),
     bids            JSONB       NOT NULL,
     asks            JSONB       NOT NULL,
     snapshot_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ,
 
     -- Ensure we don't store snapshots for invalid exchange-pair combinations
     CONSTRAINT fk_valid_exchange_pair

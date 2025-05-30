@@ -18,6 +18,7 @@ var (
 
 // ExchangeRegistry manages exchange registration and creation
 type ExchangeRegistry struct {
+	db                      *gorm.DB
 	exchangeRepo            *exchange.ExchangeRepository
 	tradingPairRepo         *traidingPair.TradingPairRepository
 	exchangeCredentialsRepo *exchangeCredentials.ExchangeCredentialRepository
@@ -25,8 +26,9 @@ type ExchangeRegistry struct {
 }
 
 func NewRegistry(repo *exchange.ExchangeRepository, tradingRepo *traidingPair.TradingPairRepository,
-	exchangeCredentialsRepo *exchangeCredentials.ExchangeCredentialRepository) *ExchangeRegistry {
+	exchangeCredentialsRepo *exchangeCredentials.ExchangeCredentialRepository, db *gorm.DB) *ExchangeRegistry {
 	return &ExchangeRegistry{
+		db:                      db,
 		exchangeRepo:            repo,
 		tradingPairRepo:         tradingRepo,
 		exchangeCredentialsRepo: exchangeCredentialsRepo,
@@ -49,7 +51,7 @@ func (r *ExchangeRegistry) GetOrCreateExchangeConfig(ctx context.Context, cfg Ex
 		exchanges[cfg.Name] = exchangeConf
 	}
 	// Start a transaction
-	tx := r.exchangeRepo.Db.WithContext(ctx).Begin()
+	tx := r.db.WithContext(ctx).Begin()
 	defer func() {
 
 		if r := recover(); r != nil {

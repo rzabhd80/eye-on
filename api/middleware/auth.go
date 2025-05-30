@@ -3,12 +3,11 @@ package middleware
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rzabhd80/eye-on/domain/user"
-	"github.com/rzabhd80/eye-on/internal/database/models"
 	"github.com/rzabhd80/eye-on/internal/helpers"
 	"strings"
 )
 
-func JWTAuthMiddleware(userRepo user.UserRepository, jwtParser helpers.JWTParser) fiber.Handler {
+func JWTAuthMiddleware(userRepo user.UserRepository, jwtParser *helpers.JWTParser) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
@@ -23,15 +22,14 @@ func JWTAuthMiddleware(userRepo user.UserRepository, jwtParser helpers.JWTParser
 				Error: "Bearer token required",
 			})
 		}
-		parser := helpers.JWTParser{}
-		claims, err := parser.ParseJWT(tokenString)
+		claims, err := jwtParser.ParseJWT(tokenString)
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(user.ErrorResponse{
 				Error: "Invalid token",
 			})
 		}
-		var foundUser models.User
-		if _, err := userRepo.GetByID(c.Context(), claims.UserID); err != nil {
+		foundUser, err := userRepo.GetByID(c.Context(), claims.UserID)
+		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(user.ErrorResponse{
 				Error: "User not found or inactive",
 			})

@@ -14,7 +14,7 @@ type User struct {
 	UserRepo         *UserRepository
 	ExchangeRepo     *exchange.ExchangeRepository
 	ExchangeCredRepo *exchangeCredentials.ExchangeCredentialRepository
-	jwtParser        *helpers.JWTParser
+	JwtParser        *helpers.JWTParser
 }
 
 func (user *User) Register(ctx context.Context, request RegisterRequest) (*AuthResponse, *ErrorResponse) {
@@ -38,7 +38,7 @@ func (user *User) Register(ctx context.Context, request RegisterRequest) (*AuthR
 	if err != nil {
 		return nil, &ErrorResponse{Error: "internal server error"}
 	}
-	token, err := user.jwtParser.GenerateJWT(&createdUser)
+	token, err := user.JwtParser.GenerateJWT(&createdUser)
 	if err != nil {
 		return nil, &ErrorResponse{Error: "internal server error"}
 	}
@@ -59,7 +59,7 @@ func (user *User) Login(ctx context.Context, request LoginRequest) (*AuthRespons
 		return nil, &ErrorResponse{Error: "invalid credentials"}
 	}
 
-	token, err := user.jwtParser.GenerateJWT(userByUsername)
+	token, err := user.JwtParser.GenerateJWT(userByUsername)
 	if err != nil {
 		return nil, &ErrorResponse{Error: "internal server error"}
 	}
@@ -79,7 +79,7 @@ func (user *User) CreateExchangeCredential(ctx context.Context, request Exchange
 		return nil, &ErrorResponse{Error: "Exchange Not Found "}
 	}
 	existingCredentials, err := user.ExchangeCredRepo.GetByUserAndExchange(ctx, userId, exchangeReg.ID)
-	if err != nil || existingCredentials != nil {
+	if err == nil && existingCredentials != nil {
 		return nil, &ErrorResponse{Error: "Exchange Credentials Already Exists "}
 	}
 	encryptedSecretKey := hex.EncodeToString([]byte(request.SecretKey))
@@ -98,6 +98,48 @@ func (user *User) CreateExchangeCredential(ctx context.Context, request Exchange
 		IsTestnet:  request.IsTestnet,
 	}
 	err = user.ExchangeCredRepo.Create(ctx, &credential)
+	if err != nil {
+		return nil, &ErrorResponse{Error: "Internal Server Error"}
+	}
+	return &ExchangeCredentialResponse{
+		ID:         credential.ID,
+		ExchangeID: exchangeReg.ID,
+		Label:      request.Label,
+		APIKey:     request.APIKey,
+		IsActive:   true,
+		IsTestnet:  false,
+		LastUsed:   nil,
+		Exchange:   *exchangeReg,
+	}, nil
+}
+
+func (user *User) UpdateExchangeCredential(ctx context.Context, request ExchangeCredentialUpdateRequest, userId uuid.UUID) (
+	*ExchangeCredentialResponse, *ErrorResponse) {
+
+	exchangeReg, err := user.ExchangeRepo.GetByName(ctx, request.ExchangeName)
+	if err != nil || exchangeReg == nil {
+		return nil, &ErrorResponse{Error: "Exchange Not Found "}
+	}
+	existingCredentials, err := user.ExchangeCredRepo.GetByUserAndExchange(ctx, userId, exchangeReg.ID)
+	if err != nil || existingCredentials == nil {
+		return nil, &ErrorResponse{Error: "Exchange Credentials Not Found "}
+	}
+	encryptedSecretKey := hex.EncodeToString([]byte(request.SecretKey))
+	encryptedPassphrase := ""
+	if request.AccessKey != "" {
+		encryptedPassphrase = hex.EncodeToString([]byte(request.AccessKey))
+	}
+	credential := models.ExchangeCredential{
+		UserID:     userId,
+		ExchangeID: exchangeReg.ID,
+		Label:      request.Label,
+		APIKey:     request.APIKey,
+		SecretKey:  encryptedSecretKey,
+		AccessKey:  encryptedPassphrase,
+		IsActive:   true,
+		IsTestnet:  request.IsTestnet,
+	}
+	err = user.ExchangeCredRepo.Update(ctx, &credential)
 	if err != nil {
 		return nil, &ErrorResponse{Error: "Internal Server Error"}
 	}

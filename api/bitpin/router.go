@@ -11,11 +11,11 @@ type Router struct {
 	Parser  *helpers.JWTParser
 }
 
-func (router *Router) SetUserRouter(fiberRouter fiber.Router) {
-	fiberRouter.Group("/Exchange/bitpin")
-	fiberRouter.Use(middleware.JWTAuthMiddleware(*router.Service.Exchange.UserRepo, *router.Parser))
-	fiberRouter.Post("/order", router.Service.PlaceOrder)
-	fiberRouter.Delete("/order", router.Service.cancelOrder)
-	fiberRouter.Delete("/orderBook", router.Service.GetOrderBook)
-	fiberRouter.Get("/balance", router.Service.GetBalance)
+func (router *Router) SetUserRouter(fiberRouter *fiber.App) {
+	group := fiberRouter.Group("/exchange/bitpin")
+	group.Use(middleware.JWTAuthMiddleware(*router.Service.Exchange.UserRepo, router.Parser))
+	group.Post("/order", router.Service.PlaceOrder)
+	group.Delete("/order", router.Service.cancelOrder)
+	group.Get("/orderBook/:symbol", router.Service.GetOrderBook)
+	group.Get("/balance", router.Service.GetBalance)
 }

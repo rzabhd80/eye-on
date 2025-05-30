@@ -1,7 +1,7 @@
 package balance
 
 type GetBalanceRequest struct {
-	Asset string `json:"asset,omitempty"` // If empty, get all balances
+	Asset string `json:"asset,omitempty"`
 }
 
 type StandardBalanceResponse struct {

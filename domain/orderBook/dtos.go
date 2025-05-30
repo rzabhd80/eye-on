@@ -2,7 +2,6 @@ package orderBook
 
 import (
 	"github.com/rzabhd80/eye-on/internal/database/models"
-	"time"
 )
 
 type GetOrderBookRequest struct {
@@ -11,10 +10,7 @@ type GetOrderBookRequest struct {
 }
 
 type StandardOrderBookRequest struct {
-	Symbol    string               `json:"symbol"`
-	Bids      []StandardOrderLevel `json:"bids"`
-	Asks      []StandardOrderLevel `json:"asks"`
-	Timestamp time.Time            `json:"timestamp"`
+	Symbol string `json:"symbol"`
 }
 
 type StandardOrderBookResponse struct {

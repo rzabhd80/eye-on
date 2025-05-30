@@ -40,13 +40,13 @@ func (jwtParser *JWTParser) GenerateJWT(userInstance *models.User) (string, erro
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtParser.EnvConf.JWTKey)
+	return token.SignedString([]byte(jwtParser.EnvConf.JWTKey))
 }
 
 func (jwtParser *JWTParser) ParseJWT(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtParser.EnvConf.JWTKey, nil
+		return []byte(jwtParser.EnvConf.JWTKey), nil
 	})
 
 	if err != nil {

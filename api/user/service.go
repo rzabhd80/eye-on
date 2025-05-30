@@ -46,3 +46,16 @@ func (service *UserAuthService) CreateExchangeCredential(c *fiber.Ctx) error {
 	}
 	return c.Status(fiber.StatusOK).JSON(response)
 }
+
+func (service *UserAuthService) UpdateExchangeCredentials(c *fiber.Ctx) error {
+	userId := c.Locals("user_id").(uuid.UUID)
+	var requestBody user.ExchangeCredentialUpdateRequest = user.ExchangeCredentialUpdateRequest{}
+	if err := c.BodyParser(&requestBody); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(user.ErrorResponse{Error: "Bad Request Format"})
+	}
+	response, err := service.User.UpdateExchangeCredential(c.Context(), requestBody, userId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(err)
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
+}

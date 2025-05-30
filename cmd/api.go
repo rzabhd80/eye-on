@@ -44,7 +44,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	redisConn := redis.RedisConnection{EnvConf: devConf}
 	appRedisClient := redisConn.NewRedisClient()
 	jwtParser := helpers.JWTParser{EnvConf: devConf}
-	request := helpers.Request{}
+	request := helpers.NewRequest(20 * time.Second)
 
 	defer func(redisCLient *redis2.Client) {
 		err := redisCLient.Close()
@@ -77,14 +77,14 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	orderBookRepo := orderBook.NewOrderBookSnapshotRepository(psqlDb.GormDb)
 	balanceRepo := balance.NewBalanceSnapshotRepository(psqlDb.GormDb)
 
-	exchangeRegistery := registry.NewRegistry(exchangeRepo, &tradingPairRepo, exchangeCredRepo)
+	exchangeRegistery := registry.NewRegistry(exchangeRepo, &tradingPairRepo, exchangeCredRepo, psqlDb.GormDb)
 
 	registry.SetDefaultRegistry(exchangeRegistery)
 
 	bitpinSymbolRegistry := bitpinEntity.BitpinSymbolRegistry{}
 	NobitexSymbolRegistry := nobitexEntity.NobitexSymbolRegistry{}
 	bitpinExchange, err := registry.GetOrCreateExchange(ctx, registry.ExchangeConfig{
-		Name:          "bitpint",
+		Name:          "bitpin",
 		DisplayName:   "bitpin",
 		BaseURL:       "https://api.bitpin.ir",
 		RateLimit:     0,
@@ -113,7 +113,9 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 			UserRepo:         userRepo,
 			ExchangeRepo:     exchangeRepo,
 			ExchangeCredRepo: exchangeCredRepo,
+			JwtParser:        &jwtParser,
 		}},
+		Parser: &jwtParser,
 	}
 
 	nobitexRouter := nobitex.Router{
@@ -143,7 +145,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 				OrderRepo:              orderRepo,
 				OrderBookRepo:          orderBookRepo,
 				BalanceRepo:            balanceRepo,
-				Request:                helpers.Request{},
+				Request:                request,
 			},
 		},
 		Parser: &jwtParser,

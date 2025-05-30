@@ -20,15 +20,16 @@ type Request struct {
 	reverseSymbolMap map[string]string
 }
 
+func NewRequest(timeout time.Duration) *Request {
+	return &Request{
+		client: &http.Client{
+			Timeout: timeout,
+		},
+	}
+}
+
 func (n *Request) MakeRequest(ctx context.Context, method, endpoint string, body []byte,
 	creds *models.ExchangeCredential, baseURL string, addBearer bool, addTokenPhrase bool) (*http.Response, []byte, error) {
-	select {
-	case n.rateLimiter <- struct{}{}:
-		defer func() { <-n.rateLimiter }()
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
-	}
-
 	url := baseURL + endpoint
 	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
 	if err != nil {

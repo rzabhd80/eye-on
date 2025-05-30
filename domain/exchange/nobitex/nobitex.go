@@ -29,7 +29,7 @@ type NobitexExchange struct {
 	OrderRepo              *order.OrderRepository
 	OrderBookRepo          *orderBook.OrderBookSnapshotRepository
 	BalanceRepo            *balance.BalanceSnapshotRepository
-	Request                helpers.Request
+	Request                *helpers.Request
 }
 
 func (exchange *NobitexExchange) Name() string                   { return exchange.NobitexExchangeModel.Name }
