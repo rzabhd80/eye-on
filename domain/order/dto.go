@@ -67,7 +67,8 @@ type CreateOrderRequest struct {
 }
 
 type CancelOrderRequest struct {
-	OrderId string `json:"orderId"`
+	OrderId string   `json:"orderId"`
+	Hours   *float64 `json:"hours,omitempty"`
 }
 type CreateOrderResponse struct {
 	OrderID   string `json:"order_id"`

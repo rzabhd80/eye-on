@@ -44,7 +44,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 	redisConn := redis.RedisConnection{EnvConf: devConf}
 	appRedisClient := redisConn.NewRedisClient()
 	jwtParser := helpers.JWTParser{EnvConf: devConf}
-	request := helpers.NewRequest(20 * time.Second)
+	request := helpers.NewRequest(10 * time.Second)
 
 	defer func(redisCLient *redis2.Client) {
 		err := redisCLient.Close()

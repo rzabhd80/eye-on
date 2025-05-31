@@ -17,6 +17,7 @@ import (
 	"github.com/rzabhd80/eye-on/internal/helpers"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -62,7 +63,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 		return nil, err
 	}
 	if respBody.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("balance request failed: %s", body)
+		return nil, fmt.Errorf("response from %s: balance request failed: %s", exchange.Name(), string(body))
 	}
 	balanceResp := struct {
 		Balance string `json:"balance"`
@@ -70,6 +71,9 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 	}{}
 	if err := json.Unmarshal(body, &balanceResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+	if balanceResp.Status == "failed" {
+		return nil, fmt.Errorf("response from %s: balance request failed: %s", exchange.Name(), string(body))
 	}
 
 	total, err := strconv.ParseFloat(balanceResp.Balance, 64)
@@ -122,9 +126,11 @@ func (exchange *NobitexExchange) GetOrderBook(ctx context.Context, symbol string
 	}
 
 	if respBody.StatusCode != http.StatusAccepted && respBody.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("order book request failed: %s", respBody.Body)
+		return nil, fmt.Errorf("response from %s: order book request failed: %s", exchange.Name(), string(body))
 	}
-
+	if orderBookResponse.Status == "failed" {
+		return nil, fmt.Errorf("response from %s: order book request failed: %s", exchange.Name(), string(body))
+	}
 	bids := make([]orderBook.StandardOrderLevel, 0, len(orderBookResponse.Bids))
 	for _, bid := range orderBookResponse.Bids {
 		if len(bid) >= 2 {
@@ -186,6 +192,10 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 	helper := &helpers.OrderCalculationHelper{}
 	orderData, err := helper.ConvertToNobitexFormat(req)
 
+	if err != nil {
+		return nil, err
+	}
+
 	body, err := json.Marshal(orderData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -199,32 +209,43 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 	if err != nil {
 		return nil, err
 	}
-
-	exchangeOrderResponse := struct {
+	fmt.Printf("response body: %s\n", string(body))
+	type ExchangeOrderResponse struct {
 		Status string `json:"status"`
 		Order  struct {
 			Type            string    `json:"type"`
+			Execution       string    `json:"execution"`
+			TradeType       string    `json:"tradeType"`
 			SrcCurrency     string    `json:"srcCurrency"`
 			DstCurrency     string    `json:"dstCurrency"`
 			Price           string    `json:"price"`
 			Amount          string    `json:"amount"`
 			TotalPrice      string    `json:"totalPrice"`
-			MatchedAmount   float64   `json:"matchedAmount"`
+			TotalOrderPrice string    `json:"totalOrderPrice"`
+			MatchedAmount   string    `json:"matchedAmount"`
 			UnmatchedAmount string    `json:"unmatchedAmount"`
+			ClientOrderID   string    `json:"clientOrderId"`
+			IsMyOrder       bool      `json:"isMyOrder"`
 			ID              int64     `json:"id"`
 			Status          string    `json:"status"`
 			Partial         bool      `json:"partial"`
-			Fee             float64   `json:"fee"`
+			Fee             string    `json:"fee"`
+			User            string    `json:"user"`
 			CreatedAt       time.Time `json:"created_at"`
-			ClientOrderID   string    `json:"clientOrderId"`
+			Market          string    `json:"market"`
+			AveragePrice    string    `json:"averagePrice"`
 		} `json:"order"`
-	}{}
+	}
+	var exchangeOrderResponse ExchangeOrderResponse
 	if err := json.Unmarshal(body, &exchangeOrderResponse); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	if respBody.StatusCode != http.StatusOK && respBody.StatusCode != http.StatusAccepted {
-		return nil, fmt.Errorf("order creation failed: %s", exchangeOrderResponse.Status)
+		return nil, fmt.Errorf("response from %s: order creation failed: %s", exchange.Name(), string(body))
+	}
+	if exchangeOrderResponse.Status == "failed" {
+		return nil, fmt.Errorf("response from %s: order creation failed: %s", exchange.Name(), string(body))
 	}
 
 	// Convert to standard response
@@ -243,11 +264,21 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 	default:
 		status = "new"
 	}
-	quantity, err := strconv.ParseFloat(exchangeOrderResponse.Order.Amount, 64)
-	if err != nil {
-		return nil, err
+	var quantity float64
+	if exchangeOrderResponse.Order.Amount != "" {
+		quantity, err = strconv.ParseFloat(exchangeOrderResponse.Order.Amount, 64)
+		if err != nil {
+			return nil, err
+		}
 	}
+	var price float64
 	priceReturned, err := strconv.ParseFloat(exchangeOrderResponse.Order.Price, 64)
+	totalPriceReturned, err := strconv.ParseFloat(exchangeOrderResponse.Order.TotalOrderPrice, 64)
+	if priceReturned != 0 {
+		price = priceReturned
+	} else if totalPriceReturned != 0 {
+		price = totalPriceReturned
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +295,7 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 		Side:                 exchangeOrderResponse.Order.Type,
 		Type:                 "market",
 		Quantity:             quantity,
-		Price:                &priceReturned,
+		Price:                &price,
 		Status:               status,
 	}
 	err = exchange.OrderRepo.Create(ctx, &orderHistory)
@@ -275,7 +306,10 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 	return &orderHistory, nil
 }
 
-func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID string, userId uuid.UUID) error {
+func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID *string, userId uuid.UUID, hours *float64) error {
+	if hours == nil {
+		return errors.New("nobitex expects hours (to cancel orders made since x hours ago)")
+	}
 	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.NobitexExchangeModel.ID)
 	if creds == nil {
 		return fmt.Errorf("credentials are required")
@@ -283,23 +317,35 @@ func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID string
 	if err != nil {
 		return errors.New("Internal Server Error")
 	}
+	orderId, err := uuid.Parse(*orderID)
+	if err != nil {
+		return errors.New("malformed order id")
+	}
+	orderHistory, err := exchange.OrderRepo.GetOrderHistoryWithTradingPair(ctx, orderId)
+	if err != nil {
+		return err
+	}
+	srcCurrency := strings.ToLower(orderHistory.TradingPair.QuoteAsset)
+	destCurrecny := strings.ToLower(orderHistory.TradingPair.BaseAsset)
 	request := exchange.Request
-	requestBody := map[string]string{
-		"Order":  orderID,
-		"Status": "Canceled",
+	requestBody := map[string]interface{}{
+		"execution":    orderHistory.Type,
+		"srcCurrency":  srcCurrency,
+		"destCurrency": destCurrecny,
+		"hours":        *hours,
 	}
 	requestBodyJson, err := json.Marshal(requestBody)
-	respBody, body, err := request.MakeRequest(ctx, "POST", "/market/orders/update-status", requestBodyJson,
+	respBody, body, err := request.MakeRequest(ctx, "POST", "/market/orders/cancel-old", requestBodyJson,
 		&models.ExchangeCredential{
 			APIKey:    creds.APIKey,
 			SecretKey: creds.SecretKey,
 			IsTestnet: creds.IsTestnet,
-		}, exchange.NobitexExchangeModel.BaseURL, true, false, helpers.ApiKeyAuth)
+		}, exchange.NobitexExchangeModel.BaseURL, false, true, helpers.ApiKeyAuth)
 	if err != nil {
 		return err
 	}
 	if respBody.StatusCode != http.StatusOK && respBody.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("order cancellation failed: %s", respBody.Body)
+		return fmt.Errorf("response from %s: order cancellation failed: %s", exchange.Name(), string(body))
 	}
 
 	var cancelResp struct {

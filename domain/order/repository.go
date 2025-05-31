@@ -81,6 +81,19 @@ func (r *OrderRepository) GetByExchangeOrderID(ctx context.Context, exchangeOrde
 	}
 	return &order, nil
 }
+func (r *OrderRepository) GetOrderHistoryWithTradingPair(ctx context.Context, orderHistoryID uuid.UUID) (*models.OrderHistory, error) {
+	var orderHistory models.OrderHistory
+
+	err := r.db.WithContext(ctx).Preload("TradingPair").
+		Where("id = ?", orderHistoryID).
+		First(&orderHistory).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &orderHistory, nil
+}
 
 func (r *OrderRepository) GetByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.OrderHistory,
 	error) {

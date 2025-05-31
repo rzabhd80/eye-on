@@ -3,6 +3,7 @@ package helpers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/rzabhd80/eye-on/domain/order"
 	"github.com/rzabhd80/eye-on/internal/database/models"
@@ -55,13 +56,11 @@ func (n *Request) MakeRequest(ctx context.Context, method, endpoint string, body
 		} else {
 			authToken = creds.APIKey
 		}
-		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", authToken)
 		req.Header.Set("X-Timestamp", timestamp)
 	}
 
 	if creds != nil && creds.APIKey != "" && apiKey == ApiKeyAuth {
-		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 		var authToken string
 		if addBearer {
 			authToken = "Bearer " + creds.APIKey
@@ -70,12 +69,10 @@ func (n *Request) MakeRequest(ctx context.Context, method, endpoint string, body
 		} else {
 			authToken = creds.APIKey
 		}
-		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", authToken)
-		req.Header.Set("X-Timestamp", timestamp)
 
 	}
-
+	fmt.Printf("request body: %s\n", string(body))
 	resp, err := n.client.Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("request failed: %w", err)
@@ -83,6 +80,7 @@ func (n *Request) MakeRequest(ctx context.Context, method, endpoint string, body
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
+	fmt.Printf("response body: %s\n", string(respBody))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -110,6 +108,20 @@ func (h *OrderCalculationHelper) ValidateOrderRequest(req *order.StandardOrderRe
 	// For limit orders, price is required
 	if req.Type == order.OrderTypeLimit && req.Price == nil {
 		return fmt.Errorf("price is required for limit orders")
+	}
+
+	req.BaseCurrency, req.QuoteCurrency = strings.ToLower(req.BaseCurrency), strings.ToLower(req.QuoteCurrency)
+	if req.BaseCurrency == "irt" {
+		req.BaseCurrency = "rls"
+	}
+	if req.QuoteCurrency == "irt" {
+		req.QuoteCurrency = "rls"
+	}
+	if req.BaseCurrency == "" || req.QuoteCurrency == "" {
+		return fmt.Errorf("nobitex expects src and dest currencies'")
+	}
+	if req.BaseCurrency != "rls" && req.BaseCurrency != "usdt" {
+		return fmt.Errorf("nobitex only supports buying usdt and rials")
 	}
 
 	// Must have either Quantity OR (BaseAmount/QuoteAmount)
@@ -230,8 +242,6 @@ func (h *OrderCalculationHelper) ConvertToNobitexFormat(req *order.StandardOrder
 		return nil, err
 	}
 
-	base, quote := req.BaseCurrency, req.QuoteCurrency
-
 	quantity, err := h.GetQuantityForExchange(req)
 	if err != nil {
 		return nil, err
@@ -241,20 +251,20 @@ func (h *OrderCalculationHelper) ConvertToNobitexFormat(req *order.StandardOrder
 	if req.Side == order.OrderSideSell {
 		orderType = "sell"
 	}
+	if req.ClientOrderId == "" {
+		return nil, errors.New("nobitex expects client order id")
+	}
 
 	orderData := map[string]interface{}{
-		"type":        orderType,
-		"srcCurrency": strings.ToLower(base),
-		"dstCurrency": strings.ToLower(quote),
-		"amount":      fmt.Sprintf("%.8f", quantity),
+		"type":          orderType,
+		"srcCurrency":   strings.ToLower(req.QuoteCurrency),
+		"dstCurrency":   strings.ToLower(req.BaseCurrency),
+		"amount":        fmt.Sprintf("%.8f", quantity),
+		"clientOrderId": req.ClientOrderId,
 	}
 
 	if req.Type == order.OrderTypeLimit && req.Price != nil {
 		orderData["price"] = fmt.Sprintf("%.8f", *req.Price)
-	}
-
-	if req.ClientOrderId != "" {
-		orderData["clientOrderId"] = req.ClientOrderId
 	}
 
 	return orderData, nil

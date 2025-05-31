@@ -95,7 +95,7 @@ func (service *BitpinService) cancelOrder(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(bitpin.ErrorResponse{Error: "Bad Request Format missing orderId as url param"})
 	}
 
-	resultErr := service.Exchange.CancelOrder(c.Context(), request.OrderId, userId)
+	resultErr := service.Exchange.CancelOrder(c.Context(), &request.OrderId, userId, nil)
 	if resultErr != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(bitpin.ErrorResponse{Error: resultErr.Error()})
 	}

@@ -30,5 +30,5 @@ type IExchange interface {
 	GetBalance(ctx context.Context, userId uuid.UUID, sign *string) ([]models.BalanceSnapshot, error)
 	GetOrderBook(ctx context.Context, symbol string, userId uuid.UUID) (*models.OrderBookSnapshot, error)
 	PlaceOrder(ctx context.Context, req *order.StandardOrderRequest, userId uuid.UUID) (*models.OrderHistory, error)
-	CancelOrder(ctx context.Context, orderID string, userId uuid.UUID) error
+	CancelOrder(ctx context.Context, orderID *string, userId uuid.UUID, hours *float64) error
 }

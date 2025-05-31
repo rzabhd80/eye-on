@@ -68,7 +68,8 @@ func (exchange *BitpinExchange) GetBalance(ctx context.Context, userId uuid.UUID
 	}
 
 	if respBody.StatusCode != http.StatusOK && respBody.StatusCode != http.StatusAccepted {
-		return nil, fmt.Errorf("API error. Exchange said: status %d, body: %s", respBody.StatusCode, string(body))
+		return nil, fmt.Errorf("API error. Exchange %s: said: status %d, body: %s", exchange.Name(),
+			respBody.StatusCode, string(body))
 	}
 
 	balances := make([]balance.StandardBalanceResponse, 0, len(balanceResp))
@@ -129,7 +130,8 @@ func (exchange *BitpinExchange) GetOrderBook(ctx context.Context, symbol string,
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	if respBody.StatusCode != http.StatusOK && respBody.StatusCode != http.StatusAccepted {
-		return nil, fmt.Errorf("API error. Exchange said: status %d, body: %s", respBody.StatusCode, string(body))
+		return nil, fmt.Errorf("API error. Exchange %s said: status %d, body: %s", exchange.Name(),
+			respBody.StatusCode, string(body))
 	}
 
 	bids := make([]orderBook.StandardOrderLevel, 0, len(orderBookResponse.Bids))
@@ -228,7 +230,8 @@ func (exchange *BitpinExchange) PlaceOrder(ctx context.Context, req *order.Stand
 	}{}
 	if respBody.StatusCode != http.StatusOK && respBody.StatusCode != http.StatusAccepted &&
 		respBody.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("API error. Exchange said: status %d, body: %s", respBody.StatusCode, string(body))
+		return nil, fmt.Errorf("API error. Exchange %s said: status %d, body: %s", exchange.Name(),
+			respBody.StatusCode, string(body))
 
 	}
 	if err := json.Unmarshal(body, &exchangeOrderResponse); err != nil {
@@ -283,8 +286,17 @@ func (exchange *BitpinExchange) PlaceOrder(ctx context.Context, req *order.Stand
 	return &orderHistory, nil
 }
 
-func (exchange *BitpinExchange) CancelOrder(ctx context.Context, orderID string, userId uuid.UUID) error {
+func (exchange *BitpinExchange) CancelOrder(ctx context.Context, orderID *string, userId uuid.UUID, hours *float64) error {
 	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.BitpinExchangeModel.ID)
+	orderId, err := uuid.Parse(*orderID)
+	if err != nil {
+		return errors.New("malformed orderId")
+	}
+	orderData, err := exchange.OrderRepo.GetByID(ctx, orderId)
+	if err != nil {
+		return errors.New("order record was not found")
+	}
+
 	if creds == nil {
 		return fmt.Errorf("credentials are required")
 	}
@@ -292,7 +304,7 @@ func (exchange *BitpinExchange) CancelOrder(ctx context.Context, orderID string,
 		return errors.New("Internal Server Error")
 	}
 	request := exchange.Request
-	endpoint := fmt.Sprintf("/api/v1/odr/orders/%s/", orderID)
+	endpoint := fmt.Sprintf("/api/v1/odr/orders/%s/", orderData.ExchangeOrderID)
 	respBody, body, err := request.MakeRequest(ctx, "DELETE", endpoint, nil, &models.ExchangeCredential{
 		APIKey:    creds.APIKey,
 		SecretKey: creds.SecretKey,
@@ -304,7 +316,8 @@ func (exchange *BitpinExchange) CancelOrder(ctx context.Context, orderID string,
 	}
 
 	if respBody.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("API error. Exchange said: status %d, body: %s", respBody.StatusCode, string(body))
+		return fmt.Errorf("API error. Exchange %s said: status %d, body: %s", exchange.Name(),
+			respBody.StatusCode, string(body))
 	}
 
 	return nil
