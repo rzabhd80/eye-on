@@ -4,7 +4,7 @@ services:
   app:
     build:
       context: ../
-      dockerfile: infra/Dockerfile
+      dockerfile: Dockerfile
     container_name: eyeon_app
     ports:
       - "8080:8080"
