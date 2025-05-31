@@ -48,7 +48,7 @@ services:
     image: postgres:15-alpine
     container_name: eyeon_db
     env_file:
-      - ../.env.dockercompose
+      - ../.env
     environment:
       - POSTGRES_DB=eyeon_db
       - POSTGRES_USER=eyeon_user
