@@ -500,6 +500,8 @@ Authorization: Bearer <token>
 ```
 
 **Standard Request Body:**
+### it can be more consistent and could have been only one request without caring about which one is required
+### i just didin`t find enough time to do that
 ```json
 {
     "symbol": "string (required)",
