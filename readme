@@ -349,6 +349,7 @@ POSTGRES_DB=eyeon_db
 POSTGRES_USER=eyeon_user
 POSTGRES_PASSWORD=your_secure_password_here
 
+
 # Redis Configuration
 REDIS_CONTAINER_NAME=eyeon_redis
 REDIS_EXTERNAL_PORT=6379
