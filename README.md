@@ -287,8 +287,10 @@ This modular approach ensures that adding new exchanges is straightforward while
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- Go 1.21+ (for local development)
+- Postgresql
+- Redis
+- Go 1.21+
+  
 
 ### Local Development
 
