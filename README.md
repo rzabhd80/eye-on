@@ -290,25 +290,6 @@ This modular approach ensures that adding new exchanges is straightforward while
 - Docker and Docker Compose
 - Go 1.21+ (for local development)
 
-### Running with Docker
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd eye-on
-   ```
-
-2. **Configure environment**
-   setup your .env file. you can check out .env.example to see what is expected
-
-3. **Start the application**
-   ```bash
-   cd infra
-   docker-compose up --build
-   ```
-
-The application will be available at `http://localhost:8080`
-
 ### Local Development
 
 1. **Install dependencies**
@@ -326,37 +307,7 @@ The application will be available at `http://localhost:8080`
 ### Environment Variables
 
 Create a `.env` file in the root directory:
-
-```env
-# App Configuration
-APP_CONTAINER_NAME=eyeon_app
-APP_EXTERNAL_PORT=8080
-APP_INTERNAL_PORT=8080
-
-# Database Configuration
-DB_CONTAINER_NAME=eyeon_db
-DB_EXTERNAL_PORT=5432
-DB_INTERNAL_PORT=5432
-DB_USER=eyeon_user
-DB_NAME=eyeon_db
-DB_PASSWORD=your_secure_password_here
-DB_HOST=db
-DB_PORT=5432
-DB_SSLMODE=disable
-
-# PostgreSQL Configuration
-POSTGRES_DB=eyeon_db
-POSTGRES_USER=eyeon_user
-POSTGRES_PASSWORD=your_secure_password_here
-
-
-# Redis Configuration
-REDIS_CONTAINER_NAME=eyeon_redis
-REDIS_EXTERNAL_PORT=6379
-REDIS_INTERNAL_PORT=6379
-REDIS_HOST=redis
-REDIS_PORT=6379
-```
+you can use the .env.example sample for you own .env
 
 ## 📚 API Documentation
 
