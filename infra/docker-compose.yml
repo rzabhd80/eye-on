@@ -9,7 +9,7 @@ services:
     ports:
       - "8080:8080"
     env_file:
-      - ../.env.dockercompose
+      - ../.env
     environment:
       - DB_HOST=db
       - DB_USER=eyeon_user

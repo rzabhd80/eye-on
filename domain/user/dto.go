@@ -35,8 +35,10 @@ type ExchangeCredentialUpdateRequest struct {
 	ExchangeName string `json:"exchange_name" validate:"required"`
 	Label        string `json:"label" validate:"required"`
 	APIKey       string `json:"api_key" validate:"required"`
-	SecretKey    string `json:"secret_key" validate:"required"`
+	SecretKey    string `json:"secret_key,omitempty"`
 	AccessKey    string `json:"access_key,omitempty"`
+	RefreshToken string `json:"refresh_key,omitempty"`
+	IsActive     string `json:"is_active,omitempty"`
 	IsTestnet    bool   `json:"is_testnet"`
 }
 

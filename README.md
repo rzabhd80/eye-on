@@ -380,14 +380,15 @@ The API provides endpoints for:
 
 ## 🔑 Authentication & Security
 
-### Bitpin Special Requirements
+### ALl APi keys, access tokens etc are encrypted and stored on database.
+# Bitpin Special Requirements
 **🚨 CRITICAL:** Bitpin expires secret keys every 15 minutes and requires renewal using a refresh token.
 
 - Auto-refresh functionality was not implemented due to time constraints
 - A bash script has been provided for manual token refresh
 - Add your refresh token to the script and execute it to update credentials
 - This process must be repeated every 15 minutes to maintain active connections
-
+- Once you got your new access token, use PUT /user/exchangeCredentials to update your bitpin credentials. 
 ### JWT Authentication
 Most endpoints require JWT authentication via the `Authorization` header:
 ```
@@ -451,6 +452,7 @@ POST /user/login
 ```
 
 #### Create Exchange Credentials
+## All Credential Tokens are encrypted before storing on the database
 ```http
 POST /user/exchangeCredentials
 Authorization: Bearer <token>
@@ -491,6 +493,7 @@ Authorization: Bearer <token>
 All exchange endpoints follow the same standardized format regardless of the target exchange (Bitpin, Nobitex, etc.).
 
 #### Place Order
+## Be Aware that Nobitex exchange only supports transactions where base currency is either tether or rials.
 ```http
 POST /exchange/{exchange_name}/order
 Authorization: Bearer <token>
@@ -503,11 +506,11 @@ Authorization: Bearer <token>
     "side": "buy|sell (required)",
     "type": "market|limit (required)",
     "quantity": "number (optional)",
-    "base_currency": "string (optional)",
-    "quote_currency": "string (optional)",
-    "base_amount": "number (optional)",
-    "quote_amount": "number (optional)",
-    "price": "number (optional)",
+    "base_currency": "string (only required for nobitex)",
+    "quote_currency": "string (only required for nobitex)",
+    "base_amount": "number (only required for bitpin)",
+    "quote_amount": "number (only required for bitpin)",
+    "price": "number (only required for nobitex)",
     "stop_price": "number (optional)",
     "time_in_force": "string (optional)",
     "client_order_id": "string (optional)"

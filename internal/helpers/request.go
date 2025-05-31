@@ -109,6 +109,9 @@ func (h *OrderCalculationHelper) ValidateOrderRequestForNobitex(req *order.Stand
 	if req.Type == order.OrderTypeLimit && req.Price == nil {
 		return fmt.Errorf("price is required for limit orders")
 	}
+	if req.BaseCurrency == "" || req.QuoteCurrency == "" {
+		return fmt.Errorf("nobitex expects src and dest currencies'")
+	}
 
 	req.BaseCurrency, req.QuoteCurrency = strings.ToLower(req.BaseCurrency), strings.ToLower(req.QuoteCurrency)
 	if req.BaseCurrency == "irt" {
@@ -117,9 +120,7 @@ func (h *OrderCalculationHelper) ValidateOrderRequestForNobitex(req *order.Stand
 	if req.QuoteCurrency == "irt" {
 		req.QuoteCurrency = "rls"
 	}
-	if req.BaseCurrency == "" || req.QuoteCurrency == "" {
-		return fmt.Errorf("nobitex expects src and dest currencies'")
-	}
+
 	if req.BaseCurrency != "rls" && req.BaseCurrency != "usdt" {
 		return fmt.Errorf("nobitex only supports buying usdt and rials")
 	}

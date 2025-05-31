@@ -9,6 +9,7 @@ import (
 	"github.com/rzabhd80/eye-on/internal/database/models"
 	envCofig "github.com/rzabhd80/eye-on/internal/envConfig"
 	"github.com/rzabhd80/eye-on/internal/helpers"
+	"strconv"
 )
 
 type User struct {
@@ -143,7 +144,11 @@ func (user *User) UpdateExchangeCredential(ctx context.Context, request Exchange
 	if err != nil {
 		return nil, &ErrorResponse{Error: "Internal Server Error "}
 	}
-	encryptedSecretKey := hex.EncodeToString([]byte(request.SecretKey))
+	var encryptedSecretKey string
+	if request.SecretKey != "" {
+		encryptedSecretKey = hex.EncodeToString([]byte(request.SecretKey))
+	}
+
 	encryptedAccKey := ""
 	if request.AccessKey != "" {
 		encryptedAccKey, err = helpers.EncryptAPIKey(request.AccessKey, ecryptionKey)
@@ -151,20 +156,39 @@ func (user *User) UpdateExchangeCredential(ctx context.Context, request Exchange
 			return nil, &ErrorResponse{Error: "Internal Server Error "}
 		}
 	}
+	var active bool
+	if request.IsActive != "" {
+		active, err = strconv.ParseBool(request.IsActive)
+	}
+	var refreshTokenEnc string
+	if request.RefreshToken != "" {
+		refreshTokenEnc, err = helpers.EncryptAPIKey(request.RefreshToken, ecryptionKey)
+		if err != nil {
+			return nil, &ErrorResponse{Error: err.Error()}
+		}
+	}
 	credential := models.ExchangeCredential{
 		UserID:     userId,
 		ExchangeID: exchangeReg.ID,
 		Label:      request.Label,
 		APIKey:     encryptedApiKey,
-		SecretKey:  encryptedSecretKey,
 		AccessKey:  encryptedAccKey,
-		IsActive:   true,
 		IsTestnet:  request.IsTestnet,
+	}
+	if request.IsActive != "" {
+		credential.IsActive = active
+	}
+	if request.SecretKey != "" {
+		credential.SecretKey = encryptedSecretKey
+	}
+	if request.RefreshToken != "" {
+		credential.RefreshKey = refreshTokenEnc
 	}
 	err = user.ExchangeCredRepo.Update(ctx, &credential)
 	if err != nil {
 		return nil, &ErrorResponse{Error: "Internal Server Error"}
 	}
+
 	response := &ExchangeCredentialResponse{
 		ID:         credential.ID,
 		ExchangeID: exchangeReg.ID,

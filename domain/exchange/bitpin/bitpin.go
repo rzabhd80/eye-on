@@ -63,13 +63,13 @@ func (exchange *BitpinExchange) GetBalance(ctx context.Context, userId uuid.UUID
 		Service string `json:"service"`
 	}
 
-	if err := json.Unmarshal(body, &balanceResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	if respBody.StatusCode != http.StatusOK && respBody.StatusCode != http.StatusAccepted {
 		return nil, fmt.Errorf("API error. Exchange %s: said: status %d, body: %s", exchange.Name(),
 			respBody.StatusCode, string(body))
+	}
+
+	if err := json.Unmarshal(body, &balanceResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	balances := make([]balance.StandardBalanceResponse, 0, len(balanceResp))
