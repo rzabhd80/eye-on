@@ -92,7 +92,7 @@ func (n *Request) MakeRequest(ctx context.Context, method, endpoint string, body
 type OrderCalculationHelper struct{}
 
 // ValidateOrderRequest validates that the order request has the required fields
-func (h *OrderCalculationHelper) ValidateOrderRequest(req *order.StandardOrderRequest) error {
+func (h *OrderCalculationHelper) ValidateOrderRequestForNobitex(req *order.StandardOrderRequest) error {
 	if req.Symbol == "" {
 		return fmt.Errorf("symbol is required")
 	}
@@ -238,7 +238,7 @@ func (h *OrderCalculationHelper) ParseSymbolParts(symbol string) (base, quote st
 }
 
 func (h *OrderCalculationHelper) ConvertToNobitexFormat(req *order.StandardOrderRequest) (map[string]interface{}, error) {
-	if err := h.ValidateOrderRequest(req); err != nil {
+	if err := h.ValidateOrderRequestForNobitex(req); err != nil {
 		return nil, err
 	}
 
@@ -270,9 +270,39 @@ func (h *OrderCalculationHelper) ConvertToNobitexFormat(req *order.StandardOrder
 	return orderData, nil
 }
 
+func (h *OrderCalculationHelper) ValidateOrderRequestForBitpin(req *order.StandardOrderRequest) error {
+	if req.Symbol == "" {
+		return fmt.Errorf("symbol is required")
+	}
+
+	if req.Side != order.OrderSideBuy && req.Side != order.OrderSideSell {
+		return fmt.Errorf("invalid side: must be 'buy' or 'sell'")
+	}
+
+	if req.Type != order.OrderTypeMarket && req.Type != order.OrderTypeLimit {
+		return fmt.Errorf("invalid type: must be 'market' or 'limit'")
+	}
+
+	// For limit orders, price is required
+	if req.Type == order.OrderTypeLimit && req.Price == nil {
+		return fmt.Errorf("price is required for limit orders")
+	}
+
+	// Must have either Quantity OR (BaseAmount/QuoteAmount)
+	hasQuantity := req.Quantity != nil && *req.Quantity > 0
+	hasBaseAmount := req.BaseAmount != nil && *req.BaseAmount > 0
+	hasQuoteAmount := req.QuoteAmount != nil && *req.QuoteAmount > 0
+
+	if !hasQuantity && !hasBaseAmount && !hasQuoteAmount {
+		return fmt.Errorf("must specify either quantity or base_amount/quote_amount")
+	}
+
+	return nil
+}
+
 // ConvertToBitpinFormat converts standard request to Bitpin format
 func (h *OrderCalculationHelper) ConvertToBitpinFormat(req *order.StandardOrderRequest) (map[string]interface{}, error) {
-	if err := h.ValidateOrderRequest(req); err != nil {
+	if err := h.ValidateOrderRequestForBitpin(req); err != nil {
 		return nil, err
 	}
 
@@ -306,40 +336,6 @@ func (h *OrderCalculationHelper) ConvertToBitpinFormat(req *order.StandardOrderR
 
 	if req.ClientOrderId != "" {
 		orderData["identifier"] = req.ClientOrderId
-	}
-
-	return orderData, nil
-}
-
-// ConvertToBinanceFormat converts standard request to Binance format
-func (h *OrderCalculationHelper) ConvertToBinanceFormat(req *order.StandardOrderRequest) (map[string]interface{}, error) {
-	if err := h.ValidateOrderRequest(req); err != nil {
-		return nil, err
-	}
-
-	quantity, err := h.GetQuantityForExchange(req)
-	if err != nil {
-		return nil, err
-	}
-
-	orderData := map[string]interface{}{
-		"symbol":   req.Symbol,
-		"side":     strings.ToUpper(string(req.Side)),
-		"type":     strings.ToUpper(string(req.Type)),
-		"quantity": fmt.Sprintf("%.8f", quantity),
-	}
-
-	if req.Type == order.OrderTypeLimit && req.Price != nil {
-		orderData["price"] = fmt.Sprintf("%.8f", *req.Price)
-		orderData["timeInForce"] = "GTC" // Default
-	}
-
-	if req.TimeInForce != "" {
-		orderData["timeInForce"] = req.TimeInForce
-	}
-
-	if req.ClientOrderId != "" {
-		orderData["newClientOrderId"] = req.ClientOrderId
 	}
 
 	return orderData, nil

@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ../
+      dockerfile: infra/Dockerfile
+    container_name: eyeon_app
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../.env.dockercompose
+    environment:
+      - DB_HOST=db
+      - DB_USER=eyeon_user
+      - DB_NAME=eyeon_db
+      - DB_PORT=5432
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - eyeon_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: eyeon_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - eyeon_network
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    container_name: eyeon_db
+    env_file:
+      - ../.env.dockercompose
+    environment:
+      - POSTGRES_DB=eyeon_db
+      - POSTGRES_USER=eyeon_user
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eyeon_user -d eyeon_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - eyeon_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  eyeon_network:
+    driver: bridge
