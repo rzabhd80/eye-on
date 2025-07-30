@@ -67,8 +67,7 @@ func (service *BitpinService) RenewAccessToken(c *fiber.Ctx) error {
 	userId := c.Locals("user_id").(uuid.UUID)
 	var request exchangeCredentials.RenewAccessTokenRequest
 	if err := c.BodyParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(bitpin.ErrorResponse{Error: "HINT:Bitpin access token expires every" +
-			" 15 min. Refresh it - Bad Request Format"})
+		return c.Status(fiber.StatusBadRequest).JSON(bitpin.ErrorResponse{Error: "Bad Request Format"})
 	}
 	creds, err := service.Exchange.RenewAccessToken(c.Context(), userId, &request)
 	if err != nil {
