@@ -17,8 +17,9 @@ import (
 type AuthToken string
 
 const (
-	ApiKeyAuth  AuthToken = "ApiKey"
-	ApiAccToken AuthToken = "ApiAccToken"
+	ApiKeyAuth      AuthToken = "ApiKey"
+	ApiAccToken     AuthToken = "ApiAccToken"
+	ApiRefreshToken AuthToken = "ApiRefreshToken"
 )
 
 type Request struct {

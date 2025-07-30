@@ -179,6 +179,48 @@ func (exchange *BitpinExchange) GetOrderBook(ctx context.Context, symbol string,
 	}
 	return &orderbookInstance, nil
 }
+
+// RenewAccessToken Renews Bitpin access token
+func (exchange *BitpinExchange) RenewAccessToken(ctx context.Context, userId uuid.UUID,
+	req *exchangeCredentials.RenewAccessTokenRequest) (
+	*models.ExchangeCredential, error) {
+	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.BitpinExchangeModel.ID)
+	if creds == nil {
+		return nil, fmt.Errorf("credentials are required")
+	}
+	if err != nil {
+		return nil, errors.New("Internal Server Error")
+	}
+	var body map[string]interface{} = map[string]interface{}{"refresh": creds.RefreshKey}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+	respBody, pureBody, err := exchange.Request.MakeRequest(ctx, "POST", "api/v1/usr/refresh_token/",
+		jsonBody, creds, exchange.BitpinExchangeModel.BaseURL, false, false, helpers.ApiRefreshToken)
+	if err != nil {
+		return nil, err
+	}
+	if respBody.StatusCode != http.StatusOK && respBody.StatusCode != http.StatusAccepted &&
+		respBody.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("API error. Exchange %s said: status %d, body: %s", exchange.Name(),
+			respBody.StatusCode, string(pureBody))
+
+	}
+	expectedResponse := struct {
+		Access string `json:"access"`
+	}{}
+	if err := json.Unmarshal(pureBody, &expectedResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+	creds.AccessKey = expectedResponse.Access
+	updateErr := exchange.ExchangeCredentialRepo.Update(ctx, creds)
+	if updateErr != nil {
+		return nil, updateErr
+	}
+	return creds, nil
+}
+
 func (exchange *BitpinExchange) PlaceOrder(ctx context.Context, req *order.StandardOrderRequest, userId uuid.UUID) (*models.OrderHistory, error) {
 	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.BitpinExchangeModel.ID)
 	if creds == nil {
