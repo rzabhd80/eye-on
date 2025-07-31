@@ -18,4 +18,5 @@ func (router *Router) SetUserRouter(fiberRouter *fiber.App) {
 	group.Delete("/order/:orderId", router.Service.cancelOrder)
 	group.Get("/orderBook/:symbol", router.Service.GetOrderBook)
 	group.Get("/balance", router.Service.GetBalance)
+	group.Post("/renew", router.Service.RenewAccessToken)
 }

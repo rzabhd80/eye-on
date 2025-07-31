@@ -62,7 +62,7 @@ func (r *ExchangeCredentialRepository) GetByUserAndExchange(ctx context.Context,
 	err := r.Db.WithContext(ctx).
 		Preload("Exchange").
 		Where("user_id = ? AND exchange_id = ? AND is_active = ?", userID, exchangeID, true).
-		Order("created_at DESC").
+		Order("updated_at DESC").
 		First(&creds).Error
 	key := r.EnvConf.EncryptionKey
 	apiKeyDecr, err := helpers.DecryptAPIKey(creds.APIKey, key)
