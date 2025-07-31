@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: ./Dockerfile
+    env_file:
+      - ../.env
+    depends_on:
+      - db
+    restart: on-failure
+#    ports:
+#      - "${APP_PORT}:${APP_PORT}"
+    network_mode: host
+  db:
+    image: postgres:15-alpine
+    env_file:
+      - ../.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+#    ports:
+#      - "${DB_PORT}:${DB_PORT}"
+    network_mode: host
+volumes:
+  postgres_data:
