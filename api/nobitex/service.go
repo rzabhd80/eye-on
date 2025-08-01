@@ -94,7 +94,7 @@ func (service *NobitexService) cancelOrder(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "missing orderId as url param Bad Request Format"})
 	}
 	if request.Hours == nil {
-		return c.Status(fiber.StatusBadRequest).JSON(nobitex.ErrorResponse{Error: "missing hours as url param Bad Request Format"})
+		*request.Hours = 1
 	}
 
 	resultErr := service.Exchange.CancelOrder(c.Context(), &request.OrderId, userId, request.Hours)
