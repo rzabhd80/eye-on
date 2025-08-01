@@ -147,6 +147,7 @@ func apiService(cntx *cli.Context, logger *zap.Logger) error {
 				OrderBookRepo:          orderBookRepo,
 				BalanceRepo:            balanceRepo,
 				Request:                request,
+				EnvConf:                devConf,
 			},
 		},
 		Parser: &jwtParser,

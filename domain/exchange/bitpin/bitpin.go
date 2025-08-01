@@ -14,6 +14,7 @@ import (
 	"github.com/rzabhd80/eye-on/domain/traidingPair"
 	"github.com/rzabhd80/eye-on/domain/user"
 	"github.com/rzabhd80/eye-on/internal/database/models"
+	envCofig "github.com/rzabhd80/eye-on/internal/envConfig"
 	"github.com/rzabhd80/eye-on/internal/helpers"
 	"net/http"
 	"strconv"
@@ -31,6 +32,7 @@ type BitpinExchange struct {
 	OrderBookRepo          *orderBook.OrderBookSnapshotRepository
 	BalanceRepo            *balance.BalanceSnapshotRepository
 	Request                *helpers.Request
+	EnvConf                *envCofig.AppConfig
 }
 
 func (exchange *BitpinExchange) Name() string                   { return exchange.BitpinExchangeModel.Name }
@@ -181,8 +183,7 @@ func (exchange *BitpinExchange) GetOrderBook(ctx context.Context, symbol string,
 }
 
 // RenewAccessToken Renews Bitpin access token
-func (exchange *BitpinExchange) RenewAccessToken(ctx context.Context, userId uuid.UUID,
-	req *exchangeCredentials.RenewAccessTokenRequest) (
+func (exchange *BitpinExchange) RenewAccessToken(ctx context.Context, userId uuid.UUID) (
 	*models.ExchangeCredential, error) {
 	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.BitpinExchangeModel.ID)
 	if creds == nil {
@@ -196,7 +197,7 @@ func (exchange *BitpinExchange) RenewAccessToken(ctx context.Context, userId uui
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
-	respBody, pureBody, err := exchange.Request.MakeRequest(ctx, "POST", "api/v1/usr/refresh_token/",
+	respBody, pureBody, err := exchange.Request.MakeRequest(ctx, "POST", "/api/v1/usr/refresh_token/",
 		jsonBody, creds, exchange.BitpinExchangeModel.BaseURL, false, false, helpers.ApiRefreshToken)
 	if err != nil {
 		return nil, err
@@ -213,7 +214,21 @@ func (exchange *BitpinExchange) RenewAccessToken(ctx context.Context, userId uui
 	if err := json.Unmarshal(pureBody, &expectedResponse); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
-	creds.AccessKey = expectedResponse.Access
+	creds.AccessKey, err = helpers.EncryptAPIKey(expectedResponse.Access, exchange.EnvConf.EncryptionKey)
+	if err != nil {
+		return nil, errors.New("Internal Server Error")
+	}
+
+	creds.RefreshKey, err = helpers.EncryptAPIKey(creds.RefreshKey, exchange.EnvConf.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+	
+	creds.APIKey, err = helpers.EncryptAPIKey(creds.APIKey, exchange.EnvConf.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+
 	updateErr := exchange.ExchangeCredentialRepo.Update(ctx, creds)
 	if updateErr != nil {
 		return nil, updateErr

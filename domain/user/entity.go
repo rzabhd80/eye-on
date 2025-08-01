@@ -98,15 +98,27 @@ func (user *User) CreateExchangeCredential(ctx context.Context, request Exchange
 			return nil, &ErrorResponse{Error: "Internal Server Error "}
 		}
 	}
+	encyptedRefreshKey := ""
+	if request.RefreshKey != "" {
+		encyptedRefreshKey, err = helpers.EncryptAPIKey(request.RefreshKey, ecryptionKey)
+		if err != nil {
+			return nil, &ErrorResponse{Error: "Internal Server Error "}
+		}
+	}
 	credential := models.ExchangeCredential{
 		UserID:     userId,
 		ExchangeID: exchangeReg.ID,
 		Label:      request.Label,
 		APIKey:     encryptedApiKey,
 		SecretKey:  encryptedSecretKey,
-		AccessKey:  encryptedAccKey,
 		IsActive:   true,
 		IsTestnet:  request.IsTestnet,
+	}
+	if request.AccessKey != "" {
+		credential.AccessKey = encryptedAccKey
+	}
+	if request.RefreshKey != "" {
+		credential.RefreshKey = encyptedRefreshKey
 	}
 	err = user.ExchangeCredRepo.Update(ctx, &credential)
 	if err != nil {
@@ -121,6 +133,9 @@ func (user *User) CreateExchangeCredential(ctx context.Context, request Exchange
 		IsTestnet:  false,
 		LastUsed:   nil,
 		Exchange:   *exchangeReg,
+	}
+	if request.RefreshKey != "" {
+		response.RefreshKey = &request.RefreshKey
 	}
 	if request.AccessKey != "" {
 		response.AccessKey = &request.AccessKey
@@ -167,40 +182,41 @@ func (user *User) UpdateExchangeCredential(ctx context.Context, request Exchange
 			return nil, &ErrorResponse{Error: err.Error()}
 		}
 	}
-	credential := models.ExchangeCredential{
-		UserID:     userId,
-		ExchangeID: exchangeReg.ID,
-		Label:      request.Label,
-		APIKey:     encryptedApiKey,
-		AccessKey:  encryptedAccKey,
-		IsTestnet:  request.IsTestnet,
+	if request.APIKey != "" {
+		existingCredentials.APIKey = encryptedApiKey
+	}
+	if request.AccessKey != "" {
+		existingCredentials.AccessKey = encryptedAccKey
 	}
 	if request.IsActive != "" {
-		credential.IsActive = active
+		existingCredentials.IsActive = active
 	}
 	if request.SecretKey != "" {
-		credential.SecretKey = encryptedSecretKey
+		existingCredentials.SecretKey = encryptedSecretKey
 	}
 	if request.RefreshToken != "" {
-		credential.RefreshKey = refreshTokenEnc
+		existingCredentials.RefreshKey = refreshTokenEnc
 	}
-	err = user.ExchangeCredRepo.Update(ctx, &credential)
+	err = user.ExchangeCredRepo.Update(ctx, existingCredentials)
 	if err != nil {
 		return nil, &ErrorResponse{Error: "Internal Server Error"}
 	}
 
 	response := &ExchangeCredentialResponse{
-		ID:         credential.ID,
+		ID:         existingCredentials.ID,
 		ExchangeID: exchangeReg.ID,
 		Label:      request.Label,
 		APIKey:     request.APIKey,
-		IsActive:   true,
+		IsActive:   existingCredentials.IsActive,
 		IsTestnet:  false,
 		LastUsed:   nil,
 		Exchange:   *exchangeReg,
 	}
 	if request.AccessKey != "" {
 		response.AccessKey = &request.AccessKey
+	}
+	if request.RefreshToken != "" {
+		response.RefreshKey = &request.RefreshToken
 	}
 	return response, nil
 }

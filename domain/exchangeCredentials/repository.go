@@ -77,8 +77,13 @@ func (r *ExchangeCredentialRepository) GetByUserAndExchange(ctx context.Context,
 			return nil, err
 		}
 	}
+	var refKeyDec string
+	if creds.RefreshKey != "" {
+		refKeyDec, err = helpers.DecryptAPIKey(creds.RefreshKey, key)
+	}
 	creds.AccessKey = accKeyDec
 	creds.APIKey = apiKeyDecr
+	creds.RefreshKey = refKeyDec
 	return creds, err
 
 }
