@@ -90,6 +90,7 @@ func (exchange *BitpinExchange) GetBalance(ctx context.Context, userId uuid.UUID
 		})
 		balanceSnapshot = append(balanceSnapshot, models.BalanceSnapshot{
 			BaseModel:    models.BaseModel{ID: uuid.New()},
+			Currency:     strings.ToUpper(balanceIns.Asset),
 			UserID:       userId,
 			ExchangeID:   exchange.BitpinExchangeModel.ID,
 			Total:        total,
@@ -223,7 +224,7 @@ func (exchange *BitpinExchange) RenewAccessToken(ctx context.Context, userId uui
 	if err != nil {
 		return nil, err
 	}
-	
+
 	creds.APIKey, err = helpers.EncryptAPIKey(creds.APIKey, exchange.EnvConf.EncryptionKey)
 	if err != nil {
 		return nil, err

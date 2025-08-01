@@ -39,7 +39,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 	if symbol == nil {
 		return nil, errors.New("Symbol cannot be null")
 	}
-	nobiSymbol := exchange.standardize(*symbol)
+	nobiSymbol := strings.ToLower(*symbol)
 	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.NobitexExchangeModel.ID)
 	if creds == nil {
 		return nil, fmt.Errorf("credentials are required")
@@ -87,6 +87,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 		ExchangeID:   exchange.NobitexExchangeModel.ID,
 		Total:        total,
 		Available:    total,
+		Currency:     nobiSymbol,
 		SnapshotTime: time.Now(),
 	}}
 	return balanceSnapshot, nil
@@ -363,7 +364,11 @@ func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID *strin
 }
 
 func (exchange *NobitexExchange) standardize(symbol string) string {
-	res := strings.Split(symbol, "_")
-	standardSymbol := res[0] + res[1]
-	return standardSymbol
+	if strings.ContainsAny(symbol, "_") {
+		res := strings.Split(symbol, "_")
+		standardSymbol := res[0] + res[1]
+		return standardSymbol
+	}
+	return symbol
+
 }
