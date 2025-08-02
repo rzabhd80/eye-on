@@ -335,15 +335,9 @@ func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID *strin
 	if err != nil {
 		return err
 	}
-	var srcCurrency string
-	var destCurrecny string
-	if orderHistory.Side == "buy" {
-		srcCurrency = strings.ToLower(orderHistory.TradingPair.QuoteAsset)
-		destCurrecny = strings.ToLower(orderHistory.TradingPair.BaseAsset)
-	} else {
-		srcCurrency = strings.ToLower(orderHistory.TradingPair.BaseAsset)
-		destCurrecny = strings.ToLower(orderHistory.TradingPair.QuoteAsset)
-	}
+	var srcCurrency string = strings.ToLower(orderHistory.TradingPair.BaseAsset)
+	var destCurrecny string = strings.ToLower(orderHistory.TradingPair.QuoteAsset)
+
 	request := exchange.Request
 	requestBody := map[string]interface{}{
 		"execution":    orderHistory.Type,
