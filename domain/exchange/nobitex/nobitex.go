@@ -283,6 +283,12 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 	} else if totalPriceReturned != 0 {
 		price = totalPriceReturned
 	}
+	var orderType string
+	if req.Type == order.OrderTypeMarket {
+		orderType = "market"
+	} else {
+		orderType = "limit"
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +303,7 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 		ClientOrderID:        strconv.FormatInt(exchangeOrderResponse.Order.ID, 10) + userId.String(),
 		ExchangeOrderID:      strconv.FormatInt(exchangeOrderResponse.Order.ID, 10),
 		Side:                 exchangeOrderResponse.Order.Type,
-		Type:                 "market",
+		Type:                 orderType,
 		Quantity:             quantity,
 		Price:                &price,
 		Status:               status,
@@ -329,8 +335,15 @@ func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID *strin
 	if err != nil {
 		return err
 	}
-	srcCurrency := strings.ToLower(orderHistory.TradingPair.QuoteAsset)
-	destCurrecny := strings.ToLower(orderHistory.TradingPair.BaseAsset)
+	var srcCurrency string
+	var destCurrecny string
+	if orderHistory.Side == "buy" {
+		srcCurrency = strings.ToLower(orderHistory.TradingPair.QuoteAsset)
+		destCurrecny = strings.ToLower(orderHistory.TradingPair.BaseAsset)
+	} else {
+		srcCurrency = strings.ToLower(orderHistory.TradingPair.BaseAsset)
+		destCurrecny = strings.ToLower(orderHistory.TradingPair.QuoteAsset)
+	}
 	request := exchange.Request
 	requestBody := map[string]interface{}{
 		"execution":    orderHistory.Type,

@@ -122,8 +122,14 @@ func (h *OrderCalculationHelper) ValidateOrderRequestForNobitex(req *order.Stand
 		req.QuoteCurrency = "rls"
 	}
 
-	if req.BaseCurrency != "rls" && req.BaseCurrency != "usdt" {
-		return fmt.Errorf("nobitex only supports buying usdt and rials")
+	if req.Side == order.OrderSideBuy && req.BaseCurrency != "rls" && req.BaseCurrency != "usdt" {
+		return fmt.Errorf("nobitex only supports buying with usdt and rials as quote currencies and selling the " +
+			"same as base currencies")
+	}
+
+	if req.Side == order.OrderSideSell && req.QuoteCurrency != "rls" && req.QuoteCurrency != "usdt" {
+		return fmt.Errorf("nobitex only supports buying with usdt and rials as quote currencies and selling the " +
+			"same as base currencies")
 	}
 
 	// Must have either Quantity OR (BaseAmount/QuoteAmount)
@@ -254,15 +260,19 @@ func (h *OrderCalculationHelper) ConvertToNobitexFormat(req *order.StandardOrder
 		orderType = "sell"
 	}
 	if req.ClientOrderId == "" {
-		return nil, errors.New("nobitex expects client order id")
+		return nil, errors.New(" missing client order id")
 	}
-
 	orderData := map[string]interface{}{
 		"type":          orderType,
-		"srcCurrency":   strings.ToLower(req.QuoteCurrency),
-		"dstCurrency":   strings.ToLower(req.BaseCurrency),
 		"amount":        fmt.Sprintf("%.8f", quantity),
 		"clientOrderId": req.ClientOrderId,
+	}
+	if orderType == "buy" {
+		orderData["srcCurrency"] = strings.ToLower(req.QuoteCurrency)
+		orderData["dstCurrency"] = strings.ToLower(req.BaseCurrency)
+	} else {
+		orderData["srcCurrency"] = strings.ToLower(req.BaseCurrency)
+		orderData["dstCurrency"] = strings.ToLower(req.QuoteCurrency)
 	}
 
 	if req.Type == order.OrderTypeLimit && req.Price != nil {
