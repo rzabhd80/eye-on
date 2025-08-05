@@ -12,11 +12,11 @@ type Router struct {
 }
 
 func (router *Router) SetUserRouter(fiberRouter *fiber.App) {
-	fiberRouter.Group("/user")
-	fiberRouter.Post("/register", router.Service.Register)
-	fiberRouter.Post("/login", router.Service.Login)
-	fiberRouter.Post("/exchangeCredentials", middleware.JWTAuthMiddleware(
+	groupRouter := fiberRouter.Group("/user")
+	groupRouter.Post("/register", router.Service.Register)
+	groupRouter.Post("/login", router.Service.Login)
+	groupRouter.Post("/exchangeCredentials", middleware.JWTAuthMiddleware(
 		*router.Service.User.UserRepo, router.Parser), router.Service.CreateExchangeCredential)
-	fiberRouter.Put("/exchangeCredentials", middleware.JWTAuthMiddleware(
+	groupRouter.Put("/exchangeCredentials", middleware.JWTAuthMiddleware(
 		*router.Service.User.UserRepo, router.Parser), router.Service.UpdateExchangeCredentials)
 }

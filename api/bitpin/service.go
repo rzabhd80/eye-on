@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rzabhd80/eye-on/domain/balance"
 	"github.com/rzabhd80/eye-on/domain/exchange/bitpin"
+	"github.com/rzabhd80/eye-on/domain/exchangeCredentials"
 	"github.com/rzabhd80/eye-on/domain/order"
 	"github.com/rzabhd80/eye-on/domain/orderBook"
 	"strings"
@@ -62,12 +63,22 @@ func (service *BitpinService) GetOrderBook(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(history)
 }
 
+func (service *BitpinService) RenewAccessToken(c *fiber.Ctx) error {
+	userId := c.Locals("user_id").(uuid.UUID)
+	creds, err := service.Exchange.RenewAccessToken(c.Context(), userId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(bitpin.ErrorResponse{Error: err.Error()})
+	}
+	response := exchangeCredentials.RenewAccessTokenResponse{AccessToken: creds.AccessKey}
+	return c.Status(fiber.StatusOK).JSON(response)
+}
+
 func (service *BitpinService) PlaceOrder(c *fiber.Ctx) error {
 	userId := c.Locals("user_id").(uuid.UUID)
 	var request order.StandardOrderRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(bitpin.ErrorResponse{Error: "HINT:Bitpin access token expires every" +
-			" 15 min. Refresh itBad Request Format"})
+			" 15 min. Refresh it - Bad Request Format"})
 	}
 	orderHistory, err := service.Exchange.PlaceOrder(c.Context(), &request, userId)
 	if err != nil {

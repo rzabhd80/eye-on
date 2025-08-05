@@ -39,6 +39,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 	if symbol == nil {
 		return nil, errors.New("Symbol cannot be null")
 	}
+	nobiSymbol := strings.ToLower(*symbol)
 	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.NobitexExchangeModel.ID)
 	if creds == nil {
 		return nil, fmt.Errorf("credentials are required")
@@ -48,7 +49,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 	}
 	request := exchange.Request
 	symbolBody := map[string]string{
-		"currency": *symbol,
+		"currency": nobiSymbol,
 	}
 	marshaledBody, err := json.Marshal(symbolBody)
 	if err != nil {
@@ -86,6 +87,7 @@ func (exchange *NobitexExchange) GetBalance(ctx context.Context, userId uuid.UUI
 		ExchangeID:   exchange.NobitexExchangeModel.ID,
 		Total:        total,
 		Available:    total,
+		Currency:     nobiSymbol,
 		SnapshotTime: time.Now(),
 	}}
 	return balanceSnapshot, nil
@@ -98,7 +100,8 @@ func (exchange *NobitexExchange) GetOrderBook(ctx context.Context, symbol string
 	if err != nil {
 		return nil, errors.New("Internal Server Error")
 	}
-	tradePair, err := exchange.TradingPairRepo.GetByExchangeAndSymbol(ctx, exchange.NobitexExchangeModel.ID, symbol)
+	nobiSymbol := exchange.standardize(symbol)
+	tradePair, err := exchange.TradingPairRepo.GetByExchangeAndSymbol(ctx, exchange.NobitexExchangeModel.ID, nobiSymbol)
 	if tradePair == nil {
 		return nil, fmt.Errorf("this symbol is not for this exchange ")
 	}
@@ -107,7 +110,7 @@ func (exchange *NobitexExchange) GetOrderBook(ctx context.Context, symbol string
 	}
 
 	request := exchange.Request
-	endpoint := fmt.Sprintf("/v3/orderbook/%s", symbol)
+	endpoint := fmt.Sprintf("/v3/orderbook/%s", nobiSymbol)
 
 	respBody, body, err := request.MakeRequest(ctx, "GET", endpoint, nil, nil,
 		exchange.NobitexExchangeModel.BaseURL, false, false, helpers.ApiKeyAuth)
@@ -184,6 +187,7 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 	if err != nil {
 		return nil, errors.New("Internal Server Error")
 	}
+	req.Symbol = exchange.standardize(req.Symbol)
 	tradePair, err := exchange.TradingPairRepo.GetByExchangeAndSymbol(ctx, exchange.NobitexExchangeModel.ID, req.Symbol)
 	if err != nil {
 		return nil, errors.New("symbol not found for this exchange")
@@ -279,6 +283,12 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 	} else if totalPriceReturned != 0 {
 		price = totalPriceReturned
 	}
+	var orderType string
+	if req.Type == order.OrderTypeMarket {
+		orderType = "market"
+	} else {
+		orderType = "limit"
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +303,7 @@ func (exchange *NobitexExchange) PlaceOrder(ctx context.Context, req *order.Stan
 		ClientOrderID:        strconv.FormatInt(exchangeOrderResponse.Order.ID, 10) + userId.String(),
 		ExchangeOrderID:      strconv.FormatInt(exchangeOrderResponse.Order.ID, 10),
 		Side:                 exchangeOrderResponse.Order.Type,
-		Type:                 "market",
+		Type:                 orderType,
 		Quantity:             quantity,
 		Price:                &price,
 		Status:               status,
@@ -325,8 +335,9 @@ func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID *strin
 	if err != nil {
 		return err
 	}
-	srcCurrency := strings.ToLower(orderHistory.TradingPair.QuoteAsset)
-	destCurrecny := strings.ToLower(orderHistory.TradingPair.BaseAsset)
+	var srcCurrency string = strings.ToLower(orderHistory.TradingPair.BaseAsset)
+	var destCurrecny string = strings.ToLower(orderHistory.TradingPair.QuoteAsset)
+
 	request := exchange.Request
 	requestBody := map[string]interface{}{
 		"execution":    orderHistory.Type,
@@ -357,4 +368,14 @@ func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID *strin
 	}
 
 	return nil
+}
+
+func (exchange *NobitexExchange) standardize(symbol string) string {
+	if strings.ContainsAny(symbol, "_") {
+		res := strings.Split(symbol, "_")
+		standardSymbol := res[0] + res[1]
+		return standardSymbol
+	}
+	return symbol
+
 }

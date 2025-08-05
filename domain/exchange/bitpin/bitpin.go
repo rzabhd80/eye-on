@@ -14,6 +14,7 @@ import (
 	"github.com/rzabhd80/eye-on/domain/traidingPair"
 	"github.com/rzabhd80/eye-on/domain/user"
 	"github.com/rzabhd80/eye-on/internal/database/models"
+	envCofig "github.com/rzabhd80/eye-on/internal/envConfig"
 	"github.com/rzabhd80/eye-on/internal/helpers"
 	"net/http"
 	"strconv"
@@ -31,6 +32,7 @@ type BitpinExchange struct {
 	OrderBookRepo          *orderBook.OrderBookSnapshotRepository
 	BalanceRepo            *balance.BalanceSnapshotRepository
 	Request                *helpers.Request
+	EnvConf                *envCofig.AppConfig
 }
 
 func (exchange *BitpinExchange) Name() string                   { return exchange.BitpinExchangeModel.Name }
@@ -88,6 +90,7 @@ func (exchange *BitpinExchange) GetBalance(ctx context.Context, userId uuid.UUID
 		})
 		balanceSnapshot = append(balanceSnapshot, models.BalanceSnapshot{
 			BaseModel:    models.BaseModel{ID: uuid.New()},
+			Currency:     strings.ToUpper(balanceIns.Asset),
 			UserID:       userId,
 			ExchangeID:   exchange.BitpinExchangeModel.ID,
 			Total:        total,
@@ -179,6 +182,61 @@ func (exchange *BitpinExchange) GetOrderBook(ctx context.Context, symbol string,
 	}
 	return &orderbookInstance, nil
 }
+
+// RenewAccessToken Renews Bitpin access token
+func (exchange *BitpinExchange) RenewAccessToken(ctx context.Context, userId uuid.UUID) (
+	*models.ExchangeCredential, error) {
+	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.BitpinExchangeModel.ID)
+	if creds == nil {
+		return nil, fmt.Errorf("credentials are required")
+	}
+	if err != nil {
+		return nil, errors.New("Internal Server Error")
+	}
+	var body map[string]interface{} = map[string]interface{}{"refresh": creds.RefreshKey}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+	respBody, pureBody, err := exchange.Request.MakeRequest(ctx, "POST", "/api/v1/usr/refresh_token/",
+		jsonBody, creds, exchange.BitpinExchangeModel.BaseURL, false, false, helpers.ApiRefreshToken)
+	if err != nil {
+		return nil, err
+	}
+	if respBody.StatusCode != http.StatusOK && respBody.StatusCode != http.StatusAccepted &&
+		respBody.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("API error. Exchange %s said: status %d, body: %s", exchange.Name(),
+			respBody.StatusCode, string(pureBody))
+
+	}
+	expectedResponse := struct {
+		Access string `json:"access"`
+	}{}
+	if err := json.Unmarshal(pureBody, &expectedResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+	creds.AccessKey, err = helpers.EncryptAPIKey(expectedResponse.Access, exchange.EnvConf.EncryptionKey)
+	if err != nil {
+		return nil, errors.New("Internal Server Error")
+	}
+
+	creds.RefreshKey, err = helpers.EncryptAPIKey(creds.RefreshKey, exchange.EnvConf.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+
+	creds.APIKey, err = helpers.EncryptAPIKey(creds.APIKey, exchange.EnvConf.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+
+	updateErr := exchange.ExchangeCredentialRepo.Update(ctx, creds)
+	if updateErr != nil {
+		return nil, updateErr
+	}
+	return creds, nil
+}
+
 func (exchange *BitpinExchange) PlaceOrder(ctx context.Context, req *order.StandardOrderRequest, userId uuid.UUID) (*models.OrderHistory, error) {
 	creds, err := exchange.ExchangeCredentialRepo.GetByUserAndExchange(ctx, userId, exchange.BitpinExchangeModel.ID)
 	if creds == nil {

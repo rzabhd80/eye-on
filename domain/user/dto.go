@@ -28,6 +28,7 @@ type ExchangeCredentialRequest struct {
 	APIKey       string `json:"api_key" validate:"required"`
 	SecretKey    string `json:"secret_key" validate:"required"`
 	AccessKey    string `json:"access_key,omitempty"`
+	RefreshKey   string `json:"refresh_key,omitempty"`
 	IsTestnet    bool   `json:"is_testnet"`
 }
 
@@ -47,6 +48,7 @@ type ExchangeCredentialResponse struct {
 	ExchangeID uuid.UUID       `json:"exchange_id"`
 	Label      string          `json:"label"`
 	APIKey     string          `json:"api_key"`
+	RefreshKey *string         `json:"refresh_key,omitempty"`
 	IsActive   bool            `json:"is_active"`
 	IsTestnet  bool            `json:"is_testnet"`
 	AccessKey  *string         `json:"access_key,omitempty"`
