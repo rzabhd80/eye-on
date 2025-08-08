@@ -343,7 +343,6 @@ func (exchange *NobitexExchange) CancelOrder(ctx context.Context, orderID *strin
 		"execution":    orderHistory.Type,
 		"srcCurrency":  srcCurrency,
 		"destCurrency": destCurrecny,
-		"hours":        *hours,
 	}
 	requestBodyJson, err := json.Marshal(requestBody)
 	respBody, body, err := request.MakeRequest(ctx, "POST", "/market/orders/cancel-old", requestBodyJson,
